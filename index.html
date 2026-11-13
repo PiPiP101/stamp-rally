@@ -687,7 +687,8 @@ class Cust {
   get card() { return this.mem || CardStore.read(); }
   saveCard(c) { if (c) { this.mem = CardStore.ok(c); CardStore.write(c); } }
   forget() { this.mem = null; CardStore.clear(); }
-  fmtTel(d) { d = String(d || '').replace(/\D/g, '').slice(0, 10); return d.length > 6 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; }
+  // รองรับเบอร์ที่มือถือเติมให้เอง เช่น +66 81 234 5678 → 081-234-5678
+  fmtTel(d) { d = String(d || '').replace(/\D/g, ''); if (/^66[1-9]\d{8}/.test(d)) d = '0' + d.slice(2); d = d.slice(0, 10); return d.length > 6 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; }
   normTel(v) { let d = String(v || '').replace(/\D/g, ''); if (/^66\d{9}$/.test(d)) d = '0' + d.slice(2); return /^0\d{9}$/.test(d) ? d : ''; }
   top() { if (this.embedded) this.el.scrollTop = 0; else window.scrollTo(0, 0); }
   names() { return State.config.boothNames || CONFIG.BOOTH_NAMES; }
@@ -765,7 +766,7 @@ class Cust {
       '<h2>' + (ex ? 'กรอกเบอร์มือถือเพื่อรับของที่ระลึก' : s ? 'กรอกเบอร์มือถือเพื่อสะสม Stamp' : 'ดูบัตรสะสมด้วยเบอร์มือถือ') + '</h2>' +
       '<p class="lead">' + (s ? 'ใช้เบอร์เดิมทุกครั้งที่ระบบถาม Stamp จะรวมอยู่ในบัตรใบเดียวกัน แม้เปลี่ยนแอปหรือล้างเบราว์เซอร์' : 'กรอกเบอร์ที่ใช้ตอนสะสม Stamp') + '</p>' +
       '<form class="tel-form" data-tel-form novalidate><label class="tel-label" for="tel-input">เบอร์มือถือ</label>' +
-      '<input id="tel-input" class="input tel-input tnum" type="tel" inputmode="numeric" autocomplete="tel" maxlength="12" placeholder="08x-xxx-xxxx" value="' + esc(this.fmtTel(demoTel)) + '" data-tel-input>' +
+      '<input id="tel-input" class="input tel-input tnum" type="tel" inputmode="numeric" autocomplete="tel" maxlength="20" placeholder="08x-xxx-xxxx" value="' + esc(this.fmtTel(demoTel)) + '" data-tel-input>' +
       '<p class="tel-err" data-tel-err' + (error ? '' : ' hidden') + '>' + esc(error || '') + '</p>' +
       '<button type="submit" class="btn btn-primary w-full mt-3" data-tel-go>' + (ex ? 'ตรวจสอบ Stamp' : s ? 'รับ Stamp' : 'ดูบัตรของฉัน') + '</button></form>' +
       '<p class="tel-note">ระบบเก็บเบอร์แบบเข้ารหัส ใช้เพื่อจำบัตรสะสมของคุณเท่านั้น</p>';
