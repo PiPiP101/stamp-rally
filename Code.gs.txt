@@ -1,0 +1,722 @@
+/*******************************************************************
+ * Axtra Club Soft Launch — Stamp Rally (ระบบจริง วันงาน 14 พ.ย. 2569)
+ * Backend: Google Apps Script Web App + Google Sheets (ฟรี)
+ *
+ * ลูกค้าสแกน QR 3 บูธ (ด้วย LINE หรือกล้องมือถือ) → ครบแล้วสแกน QR จุดรับของที่ระลึก
+ * ไม่เก็บชื่อ/เบอร์: ระบบสร้างรหัสลูกค้าเองตอนสแกนครั้งแรก และจำไว้ในมือถือเครื่องนั้น
+ *
+ * หน้าเว็บ:  QR บูธ/จุดรับของ → ?s=B1-xxxx  |  Dashboard → ?p=dashboard  |  Prototype → ?p=showcase
+ * ติดตั้ง:  วางไฟล์นี้ใน Code.gs + ไฟล์ HTML ชื่อ index → Run setup → Deploy เป็น Web app
+ *           (Execute as: Me | Who has access: Anyone)
+ *******************************************************************/
+
+const TZ = 'Asia/Bangkok';
+const TOKEN_HOURS = 14;
+const CACHE_SETTINGS = 'stamp_settings_v1';
+const CACHE_DASH = 'stamp_dash_v1';
+const SHEETS = { PLAYERS: 'Players', SCANS: 'Scans', SETTINGS: 'Settings', SUMMARY: 'Summary' };
+const MIN_PLAYER_ROWS = 3000;   // เตรียมแถวไว้ล่วงหน้า (คาดคนมา ~700 คน)
+const SCAN_REPLAY_SEC = 600;    // สแกนซ้ำจากการเชื่อมต่อหลุด (คำขอเดิม) ได้ผลเดิม ภายใน 10 นาที
+
+const COLS = [
+  ['Code', 'code'], ['CreatedAt', 'createdAt'], ['FirstBooth', 'firstBooth'],
+  ['Booth1At', 'b1'], ['Booth2At', 'b2'], ['Booth3At', 'b3'], ['Stamps', 'stamps'],
+  ['CompletedAt', 'completedAt'], ['RedeemedAt', 'redeemedAt'], ['Status', 'status'],
+  ['Channel', 'channel'], ['ExitFails', 'exitFails'], ['MergedInto', 'mergedInto'], ['LastScanAt', 'lastScanAt'],
+  ['PhoneKey', 'phoneKey'], ['Phone4', 'phone4']
+];
+const HEADERS = COLS.map(function (c) { return c[0]; });
+const C = {}; COLS.forEach(function (c, i) { C[c[1]] = i + 1; });
+const DATE_KEYS = ['createdAt', 'b1', 'b2', 'b3', 'completedAt', 'redeemedAt', 'lastScanAt'];
+const STATUS = ['สแกน 1 บูธ', 'สแกน 2 บูธ', 'ครบ 3 บูธ ยังไม่แลก', 'แลกของแล้ว'];
+const GROUP_SHEETS = ['กลุ่ม1 สแกน 1 บูธ', 'กลุ่ม2 สแกน 2 บูธ', 'กลุ่ม3 ครบ ยังไม่แลก', 'กลุ่ม4 แลกของแล้ว'];
+const POINTS = ['B1', 'B2', 'B3', 'EX'];
+const CODE_FIRST = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+const CODE_REST = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+const DEFAULT_SETTINGS = [
+  ['EVENT_NAME', 'Axtra Club Soft Launch', 'ชื่องาน (แสดงบนหน้าจอลูกค้าและ Dashboard)'],
+  ['APP_URL', '', 'ลิงก์หน้าเว็บที่โฮสต์ไว้ (เช่น https://ชื่อ.github.io/stamp-rally/) QR ทุกจุดจะชี้มาที่ลิงก์นี้'],
+  ['EVENT_START', '17:30', 'เวลาเริ่มงาน (ใช้เป็นจุดเริ่มกราฟ)'],
+  ['BOOTH_1', 'บูธที่ 1', 'ชื่อบูธที่ 1'],
+  ['BOOTH_2', 'บูธที่ 2', 'ชื่อบูธที่ 2'],
+  ['BOOTH_3', 'บูธที่ 3', 'ชื่อบูธที่ 3'],
+  ['EXIT_NAME', 'จุดรับแลกของที่ระลึก', 'ชื่อจุดรับของที่ระลึก (ประตูทางออก)'],
+  ['PIN', '', 'PIN สำหรับเปิด Dashboard และหน้า QR'],
+  ['PROTOTYPE_MODE', 'FALSE', 'FALSE = ใช้งานจริง | TRUE = เปิดหน้า Prototype และปุ่มจำลองคนเดินงาน (ใช้ตอนโชว์ลูกค้าเท่านั้น)']
+];
+
+/* ================================================================ ENTRY */
+
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.action) {
+    if (p.action !== 'ping' && p.action !== 'config') return json_(fail_('METHOD_NOT_ALLOWED', 'คำสั่งนี้ต้องส่งแบบ POST'));
+    return json_(route_({ action: p.action }));
+  }
+  let title = 'Axtra Club Stamp Rally';
+  try { title = (getSettings_().EVENT_NAME || 'Axtra Club') + ' · Stamp Rally'; } catch (err) { /* ยังไม่ได้ setup */ }
+  // ส่ง URL ของ Web app ให้หน้าเว็บไว้ใช้สำรอง (บางแอปเปิดลิงก์แล้ว google.script.run ใช้ไม่ได้)
+  const boot = '<script>window.__EXEC_URL=' + JSON.stringify(serviceUrl_()).replace(/</g, '\\u003c') + ';</script>';
+  return HtmlService.createHtmlOutputFromFile('index')
+    .append(boot)
+    .setTitle(title)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  let req;
+  try { req = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
+  catch (err) { return json_(fail_('BAD_JSON', 'รูปแบบข้อมูลไม่ถูกต้อง')); }
+  return json_(route_(req));
+}
+
+function api(req) { return route_(req); }
+
+function route_(req) {
+  req = req || {};
+  const action = String(req.action || '');
+  try {
+    switch (action) {
+      case 'ping': return ok_({ time: Date.now() });
+      case 'config': return ok_(publicConfig_(getSettings_()));
+      case 'scan': return scan_(req);
+      case 'state': return state_(req);
+      case 'merge': return merge_(req);
+      case 'login': return login_(req);
+      case 'session': return session_(req);
+      case 'dashboard': return dashboard_(req);
+      case 'export': return export_(req);
+      case 'points': return points_(req);
+      case 'simulate': return simulate_(req);
+      default: return fail_('UNKNOWN_ACTION', 'ไม่รู้จักคำสั่ง: ' + action);
+    }
+  } catch (err) {
+    console.error(action, err && err.stack ? err.stack : err);
+    return fail_('SERVER_ERROR', 'ระบบขัดข้องชั่วคราว กรุณาสแกนอีกครั้งค่ะ', { detail: String(err && err.message ? err.message : err) });
+  }
+}
+
+/* ================================================================ CUSTOMER */
+
+/** สแกน QR บูธ (B1–B3) หรือจุดรับของ (EX) */
+function scan_(req) {
+  const pt = parsePoint_(req.s);
+  if (!pt) return fail_('BAD_QR', 'QR นี้ใช้ไม่ได้ค่ะ กรุณาสแกนจากป้ายในงาน');
+  const ch = req.ch === 'LINE' ? 'LINE' : 'WEB';
+  // rid = รหัสของการสแกนครั้งนั้น ถ้าเน็ตหลุดแล้วหน้าเว็บส่งซ้ำ จะได้ผลเดิม (ไม่กลายเป็น "รับไปแล้ว")
+  const rid = String(req.rid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32);
+  const cache = CacheService.getScriptCache(), ridKey = rid.length >= 8 ? 'scan_' + rid : '';
+  const replay = function () { const hit = ridKey && cache.get(ridKey); return hit ? JSON.parse(hit) : null; };
+  let out = replay();
+  if (out) return out;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return fail_('BUSY', 'มีผู้สแกนพร้อมกันจำนวนมาก กรุณาสแกนอีกครั้งค่ะ');
+  let result, p, now = new Date();
+  try {
+    out = replay();
+    if (out) return out;
+    const sh = sheet_(SHEETS.PLAYERS);
+    const tel = normTel_(req.tel);
+    if (req.tel && !tel) return fail_('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
+    const found = cardFor_(sh, req.code, req.key, tel);
+    p = found.p;
+    let row = found.row;
+    // บัตรผูกกับเบอร์มือถือ: เครื่องจำบัตรไม่ได้ (เปลี่ยนแอป/ล้างเบราว์เซอร์) → ขอเบอร์ก่อน ไม่สร้างบัตรใหม่มั่ว
+    if (!p && !tel) { logScan_(now, '', pt, 'NEED_TEL', ch); return ok_({ result: 'NEED_TEL', point: pt }); }
+
+    if (pt === 'EX') {
+      if (!p) { logScan_(now, '', pt, 'NO_CARD', ch); return ok_({ result: 'NO_CARD', point: pt, tel4: tel.slice(-4) }); }
+      if (p.redeemedAt) result = 'ALREADY';
+      else if (countStamps_(p) < 3) { p.exitFails = (Number(p.exitFails) || 0) + 1; result = 'INCOMPLETE'; }
+      else { p.redeemedAt = now; result = 'REDEEMED'; }
+    } else {
+      const k = 'b' + pt.charAt(1);
+      if (!p) { p = newPlayer_(sh, now, ch); row = 0; }
+      if (tel && !p.phoneKey) { p.phoneKey = phoneKey_(tel); p.phone4 = tel.slice(-4); }
+      if (p.redeemedAt) result = 'ALREADY';
+      else if (p[k]) result = 'DUP';
+      else { p[k] = now; if (!p.firstBooth) p.firstBooth = pt; result = 'NEW_STAMP'; }
+    }
+    p.lastScanAt = now;
+    recompute_(p);
+    writePlayer_(sh, row, p);
+    logScan_(now, p.code, pt, result, ch);
+    SpreadsheetApp.flush();
+    out = ok_({ result: result, point: pt, card: cardOut_(p) });
+    if (ridKey) cache.put(ridKey, JSON.stringify(out), SCAN_REPLAY_SEC);
+  } finally { lock.releaseLock(); }
+  cache.remove(CACHE_DASH);
+  return out;
+}
+
+/** เปิดบัตรของตัวเอง (ไม่ได้สแกน) */
+function state_(req) {
+  const tel = normTel_(req.tel);
+  if (req.tel && !tel) return fail_('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
+  const found = cardFor_(sheet_(SHEETS.PLAYERS), req.code, req.key, tel);
+  return found.p ? ok_({ card: cardOut_(found.p) }) : fail_('NOT_FOUND', tel ? 'ยังไม่มีบัตรของเบอร์นี้ สแกน QR ที่บูธเพื่อเริ่มสะสมได้เลยค่ะ' : 'ไม่พบบัตรในเครื่องนี้');
+}
+
+/** รวม Stamp: ลูกค้าเผลอสแกนคนละแอป → ใส่รหัสเดิมเพื่อรวมเป็นใบเดียว */
+function merge_(req) {
+  const target = String(req.target || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z][A-Z0-9]{4}$/.test(target)) return fail_('INVALID', 'รหัสมี 5 ตัว เช่น K7Q2X');
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return fail_('BUSY', 'ระบบกำลังทำงาน กรุณาลองอีกครั้ง');
+  let t;
+  try {
+    const sh = sheet_(SHEETS.PLAYERS);
+    let tRow = findRow_(sh, C.code, target);
+    if (!tRow) return fail_('NOT_FOUND', 'ไม่พบรหัส ' + target + ' กรุณาตรวจสอบอีกครั้ง');
+    t = readRow_(sh, tRow);
+    if (t.mergedInto) { tRow = findRow_(sh, C.code, t.mergedInto); t = readRow_(sh, tRow); }
+    const cur = findCard_(sh, req.code, req.key);
+    if (cur.p && cur.p.code !== t.code) {
+      const c = cur.p;
+      ['b1', 'b2', 'b3'].forEach(function (k) {
+        const a = toDate_(t[k]), b = toDate_(c[k]);
+        if (b && (!a || b < a)) t[k] = b;
+      });
+      const cr = toDate_(c.redeemedAt), tr = toDate_(t.redeemedAt);
+      if (cr && (!tr || cr < tr)) t.redeemedAt = cr;
+      t.exitFails = (Number(t.exitFails) || 0) + (Number(c.exitFails) || 0);
+      if (!t.firstBooth) t.firstBooth = c.firstBooth;
+      c.mergedInto = t.code;
+      recompute_(c);
+      writePlayer_(sh, cur.row, c);
+      logScan_(new Date(), c.code, 'MERGE', 'INTO ' + t.code, '');
+    }
+    recompute_(t);
+    writePlayer_(sh, tRow, t);
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+  CacheService.getScriptCache().remove(CACHE_DASH);
+  return ok_({ card: cardOut_(t) }, 'รวม Stamp แล้ว');
+}
+
+/* ================================================================ DASHBOARD */
+
+function login_(req) {
+  const s = getSettings_(), pin = String(req.pin || '').trim();
+  if (!s.PIN || pin !== String(s.PIN)) { Utilities.sleep(1200); return fail_('BAD_PIN', 'PIN ไม่ถูกต้อง'); }
+  const exp = Date.now() + TOKEN_HOURS * 3600 * 1000;
+  return ok_({ token: 'staff.' + exp + '.' + signToken_(exp, s), role: 'staff', expiresAt: exp });
+}
+
+function session_(req) { return auth_(req.token) ? ok_({ role: 'staff' }) : fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง'); }
+
+function dashboard_(req) {
+  if (!auth_(req.token)) return fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
+  const cache = CacheService.getScriptCache(), hit = cache.get(CACHE_DASH);
+  if (hit) return ok_(JSON.parse(hit));
+  const s = getSettings_();
+  const lite = readPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
+    return { code: p.code, ch: p.channel, b: [ms_(p.b1), ms_(p.b2), ms_(p.b3)], red: ms_(p.redeemedAt), fails: Number(p.exitFails) || 0 };
+  });
+  const out = {
+    summary: buildStampSummary(lite, { boothNames: boothNames_(s), nowMs: Date.now(), startMin: hmToMin_(s.EVENT_START), step: 15 }),
+    generatedAt: Date.now(), eventName: s.EVENT_NAME, prototype: isTrue_(s.PROTOTYPE_MODE)
+  };
+  const txt = JSON.stringify(out);
+  if (txt.length < 95000) cache.put(CACHE_DASH, txt, 6);
+  return ok_(out);
+}
+
+function export_(req) {
+  if (!auth_(req.token)) return fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
+  const s = getSettings_();
+  const rows = readPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
+    const o = {};
+    COLS.forEach(function (c) {
+      if (c[1] === 'phoneKey') return;   // ไม่ส่งค่าเบอร์เข้ารหัสออกไป
+      const v = p[c[1]];
+      o[c[1]] = DATE_KEYS.indexOf(c[1]) > -1 ? (toDate_(v) ? Utilities.formatDate(toDate_(v), TZ, 'yyyy-MM-dd HH:mm:ss') : '') : v;
+    });
+    return o;
+  });
+  return ok_({ players: rows, boothNames: boothNames_(s), generatedAt: Date.now(), eventName: s.EVENT_NAME });
+}
+
+function points_(req) {
+  if (!auth_(req.token)) return fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
+  const s = getSettings_(), names = boothNames_(s).concat([s.EXIT_NAME || 'จุดรับแลกของที่ระลึก']);
+  return ok_({ publicUrl: serviceUrl_(), appUrl: appUrl_(), points: POINTS.map(function (id, i) { return { id: id, name: names[i], s: id + '-' + pointSig_(id) }; }) });
+}
+
+/** โหมด Prototype: เพิ่มผู้เล่นจำลองและเดินเกมต่อให้คนที่ยังเล่นไม่ครบ */
+function simulate_(req) {
+  if (!auth_(req.token)) return fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
+  if (!isTrue_(getSettings_().PROTOTYPE_MODE)) return fail_('OFF', 'ปิดโหมด Prototype แล้ว');
+  const n = Math.max(0, Math.min(20, Number(req.n) || 0));
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return fail_('BUSY', 'ระบบกำลังทำงาน');
+  try {
+    const sh = sheet_(SHEETS.PLAYERS), now = new Date();
+    const list = readPlayersWithRow_(sh).filter(function (x) { return !x.p.mergedInto && !x.p.redeemedAt; });
+    for (let k = 0; k < Math.ceil(n * 1.3) && list.length; k++) {
+      const x = list.splice(Math.floor(Math.random() * list.length), 1)[0], p = x.p;
+      const missing = ['b1', 'b2', 'b3'].filter(function (b) { return !p[b]; });
+      if (missing.length) p[missing[Math.floor(Math.random() * missing.length)]] = now;
+      else if (Math.random() < 0.9) p.redeemedAt = now;
+      p.lastScanAt = now; recompute_(p); writePlayer_(sh, x.row, p);
+    }
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      const p = blankPlayer_(uniqueCode_(sh), now, Math.random() < 0.85 ? 'LINE' : 'WEB');
+      const b = 1 + Math.floor(Math.random() * 3);
+      p['b' + b] = now; p.firstBooth = 'B' + b; p.lastScanAt = now; recompute_(p);
+      rows.push(toRow_(p));
+    }
+    writeRows_(sh, rows);
+  } finally { lock.releaseLock(); }
+  CacheService.getScriptCache().remove(CACHE_DASH);
+  return ok_({ added: n });
+}
+
+/* ================================================================ HELPERS */
+
+function findCard_(sh, code, key) {
+  code = String(code || '').toUpperCase();
+  if (!code || !key || key !== cardKey_(code)) return { p: null, row: 0 };
+  let row = findRow_(sh, C.code, code);
+  if (!row) return { p: null, row: 0 };
+  let p = readRow_(sh, row);
+  if (p.mergedInto) {
+    const r2 = findRow_(sh, C.code, p.mergedInto);
+    if (r2) { row = r2; p = readRow_(sh, r2); }
+  }
+  return { p: p, row: row };
+}
+
+/** เบอร์มือถือไทย 10 หลัก (ตัดขีด/เว้นวรรค, +66 → 0) */
+function normTel_(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (/^66\d{9}$/.test(d)) d = '0' + d.slice(2);
+  return /^0\d{9}$/.test(d) ? d : '';
+}
+
+/** เก็บเบอร์แบบเข้ารหัสทางเดียว (HMAC) ไม่เก็บเบอร์เต็ม */
+function phoneKey_(tel) {
+  return Utilities.computeHmacSha256Signature('tel|' + tel, secret_()).slice(0, 12)
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function findByPhone_(sh, tel) {
+  let row = findRow_(sh, C.phoneKey, phoneKey_(tel));
+  if (!row) return { p: null, row: 0 };
+  let p = readRow_(sh, row);
+  if (p.mergedInto) {
+    const r2 = findRow_(sh, C.code, p.mergedInto);
+    if (r2) { row = r2; p = readRow_(sh, r2); }
+  }
+  return { p: p, row: row };
+}
+
+/** หาบัตร: ถ้ากรอกเบอร์ เบอร์คือตัวจริง (บัตรของเบอร์นั้น หรือบัตรในเครื่องที่ยังไม่ผูกเบอร์) ไม่งั้นใช้บัตรที่เครื่องจำไว้ */
+function cardFor_(sh, code, key, tel) {
+  const dev = findCard_(sh, code, key);
+  if (!tel) return dev;
+  const byTel = findByPhone_(sh, tel);
+  if (byTel.p) return byTel;
+  if (dev.p && !dev.p.phoneKey) return dev;
+  return { p: null, row: 0 };
+}
+
+function newPlayer_(sh, now, ch) { return blankPlayer_(uniqueCode_(sh), now, ch); }
+
+function blankPlayer_(code, now, ch) {
+  return { code: code, createdAt: now, firstBooth: '', b1: '', b2: '', b3: '', stamps: 0, completedAt: '', redeemedAt: '', status: '', channel: ch, exitFails: 0, mergedInto: '', lastScanAt: now, phoneKey: '', phone4: '' };
+}
+
+function uniqueCode_(sh) {
+  let code;
+  do {
+    code = CODE_FIRST.charAt(Math.floor(Math.random() * CODE_FIRST.length));
+    for (let i = 0; i < 4; i++) code += CODE_REST.charAt(Math.floor(Math.random() * CODE_REST.length));
+  } while (findRow_(sh, C.code, code));
+  return code;
+}
+
+function countStamps_(p) { return ['b1', 'b2', 'b3'].filter(function (k) { return !!toDate_(p[k]); }).length; }
+
+function recompute_(p) {
+  const n = countStamps_(p);
+  p.stamps = n;
+  if (n >= 3 && !toDate_(p.completedAt)) p.completedAt = new Date(Math.max(ms_(p.b1), ms_(p.b2), ms_(p.b3)));
+  if (p.mergedInto) p.status = 'รวมกับ ' + p.mergedInto;
+  else if (toDate_(p.redeemedAt)) p.status = STATUS[3];
+  else p.status = n >= 3 ? STATUS[2] : n > 0 ? STATUS[n - 1] : '';
+}
+
+function cardOut_(p) {
+  return {
+    code: p.code, key: cardKey_(p.code), stamps: [ms_(p.b1), ms_(p.b2), ms_(p.b3)], count: countStamps_(p),
+    redeemedAt: ms_(p.redeemedAt), channel: p.channel || 'WEB', tel4: p.phone4 ? String(p.phone4) : ''
+  };
+}
+
+function readPlayers_() { return readPlayersWithRow_(sheet_(SHEETS.PLAYERS)).map(function (x) { return x.p; }); }
+
+function readPlayersWithRow_(sh) {
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, COLS.length).getValues()
+    .map(function (r, i) { return { row: i + 2, p: rowObj_(r) }; })
+    .filter(function (x) { return x.p.code; });
+}
+
+function readRow_(sh, row) { return rowObj_(sh.getRange(row, 1, 1, COLS.length).getValues()[0]); }
+
+function rowObj_(r) {
+  const o = {};
+  COLS.forEach(function (c, i) { o[c[1]] = r[i]; });
+  o.code = String(o.code || '').trim();
+  o.mergedInto = String(o.mergedInto || '').trim();
+  o.channel = String(o.channel || '');
+  o.firstBooth = String(o.firstBooth || '');
+  o.phoneKey = String(o.phoneKey || '').trim();
+  o.phone4 = o.phone4 === '' || o.phone4 == null ? '' : ('000' + String(o.phone4).trim()).slice(-4);
+  return o;
+}
+
+function toRow_(p) {
+  return COLS.map(function (c) {
+    const v = p[c[1]];
+    if (c[1] === 'code' || c[1] === 'mergedInto' || c[1] === 'phoneKey' || c[1] === 'phone4') return v ? String(v) : '';   // คอลัมน์นี้ตั้งเป็นข้อความ (@) ไว้แล้ว
+    if (v instanceof Date || typeof v === 'number' || typeof v === 'boolean') return v;
+    return v == null ? '' : String(v);
+  });
+}
+
+function writePlayer_(sh, row, p) {
+  if (row) sh.getRange(row, 1, 1, COLS.length).setValues([toRow_(p)]);
+  else writeRows_(sh, [toRow_(p)]);
+}
+
+function writeRows_(sh, rows) {
+  if (!rows.length) return;
+  const start = sh.getLastRow() + 1, max = sh.getMaxRows(), need = start + rows.length - 1 - max;
+  if (need > 0) {
+    const add = Math.max(need, 500);
+    sh.insertRowsAfter(max, add);
+    formatPlayerColumns_(sh, max + 1, add);
+  }
+  sh.getRange(start, 1, rows.length, COLS.length).setValues(rows);
+}
+
+function logScan_(when, code, point, result, ch) {
+  try {
+    let sh = ss_().getSheetByName(SHEETS.SCANS);
+    if (!sh) { sh = ss_().insertSheet(SHEETS.SCANS); sh.appendRow(['Time', 'Code', 'Point', 'Result', 'Channel']); }
+    sh.appendRow([when, code ? "'" + code : '', point, result, ch]);
+  } catch (err) { console.warn('log failed', err); }
+}
+
+function findRow_(sh, col, value) {
+  const last = sh.getLastRow();
+  if (last < 2 || !value) return 0;
+  const cell = sh.getRange(2, col, last - 1, 1).createTextFinder(String(value)).matchEntireCell(true).matchCase(false).findNext();
+  return cell ? cell.getRow() : 0;
+}
+
+function sheet_(name) {
+  const sh = ss_().getSheetByName(name);
+  if (!sh) throw new Error('ไม่พบชีต ' + name + ' — กรุณารันฟังก์ชัน setup ก่อน');
+  return sh;
+}
+
+let SS_ = null;
+function ss_() {
+  if (SS_) return SS_;
+  const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  SS_ = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  if (!SS_) throw new Error('ไม่พบ Google Sheet — สร้างสคริปต์จากเมนู Extensions > Apps Script ของชีต');
+  return SS_;
+}
+
+function getSettings_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get(CACHE_SETTINGS);
+  if (hit) return JSON.parse(hit);
+  const out = {};
+  DEFAULT_SETTINGS.forEach(function (d) { out[d[0]] = d[1]; });
+  const sh = ss_().getSheetByName(SHEETS.SETTINGS);
+  if (sh && sh.getLastRow() > 1) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 2).getDisplayValues().forEach(function (r) {
+      const k = String(r[0]).trim();
+      if (k) out[k] = String(r[1]).trim();
+    });
+  }
+  cache.put(CACHE_SETTINGS, JSON.stringify(out), 60);
+  return out;
+}
+
+function publicConfig_(s) {
+  return { eventName: s.EVENT_NAME, boothNames: boothNames_(s), exitName: s.EXIT_NAME, publicUrl: serviceUrl_(), appUrl: appUrl_(s), prototype: isTrue_(s.PROTOTYPE_MODE) };
+}
+
+function boothNames_(s) { return [s.BOOTH_1 || 'บูธที่ 1', s.BOOTH_2 || 'บูธที่ 2', s.BOOTH_3 || 'บูธที่ 3']; }
+/** ลิงก์หน้าเว็บที่โฮสต์แยก (ต้องเป็น https) ตัด ?query และ #hash ออก */
+function appUrl_(s) {
+  const u = String((s || getSettings_()).APP_URL || '').trim().split('#')[0].split('?')[0];
+  return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : '';
+}
+
+function serviceUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch (err) { return ''; } }
+function parsePoint_(s) {
+  const m = String(s || '').match(/^(B[123]|EX)-([A-Za-z0-9]{6,12})$/);
+  return m && m[2] === pointSig_(m[1]) ? m[1] : null;
+}
+function pointSig_(id) { return sign_('pt|' + id).slice(0, 8); }
+function cardKey_(code) { return sign_('card|' + String(code).toUpperCase()).slice(0, 12); }
+
+function secret_() {
+  const props = PropertiesService.getScriptProperties();
+  let s = props.getProperty('TOKEN_SECRET');
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('TOKEN_SECRET', s); }
+  return s;
+}
+function sign_(text) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(text, secret_())).replace(/[=_-]/g, ''); }
+function signToken_(exp, s) { return sign_('tok|' + exp + '|' + s.PIN).slice(0, 16); }
+function auth_(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'staff' || !(Number(parts[1]) > Date.now())) return false;
+  return parts[2] === signToken_(parts[1], getSettings_());
+}
+
+function ok_(data, message, code) { return { success: true, code: code || 'OK', message: message || '', data: data === undefined ? null : data }; }
+function fail_(code, message, data) { return { success: false, code: code, message: message, data: data || null }; }
+function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function toDate_(v) {
+  if (!v) return null;
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? null : v;
+  const d = new Date(v); return isNaN(d.getTime()) ? null : d;
+}
+function ms_(v) { const d = toDate_(v); return d ? d.getTime() : null; }
+function hmToMin_(v) { const m = String(v || '').match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : 1050; }
+function isTrue_(v) { return v === true || /^(true|yes|1|y|on)$/i.test(String(v == null ? '' : v).trim()); }
+
+/* ---- SHARED: สรุปผล Stamp Rally (ใช้ทั้งฝั่ง Apps Script และหน้าเว็บโหมดตัวอย่าง) ----
+ * players: [{ code, ch: 'LINE'|'WEB', b: [ms|null, ms|null, ms|null], red: ms|null, fails: number }]
+ * cfg:     { boothNames: [3 ชื่อ], nowMs, startMin, step }
+ * เวลาใช้เขตเวลาไทย (UTC+7 ไม่มี Daylight saving)
+ */
+function buildStampSummary(players, cfg) {
+  var step = cfg.step || 15;
+  var names = cfg.boothNames || ['บูธที่ 1', 'บูธที่ 2', 'บูธที่ 3'];
+  var tod = function (ms) { return Math.floor(((ms / 60000) + 420) % 1440); };
+  var hhmm = function (m) { return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); };
+  var groups = [0, 0, 0, 0], booths = [0, 0, 0], line = 0, fails = 0, durs = [], events = [], firsts = [], reds = [];
+
+  players.forEach(function (p) {
+    var ts = (p.b || []).filter(function (t) { return !!t; });
+    if (!ts.length) return;
+    var cnt = Math.min(ts.length, 3);
+    if (p.red) groups[3]++; else if (cnt >= 3) groups[2]++; else groups[cnt - 1]++;
+    (p.b || []).forEach(function (t, i) { if (t) { booths[i]++; events.push({ ms: t, type: 'stamp', code: p.code, booth: i }); } });
+    if (p.red) { reds.push(p.red); events.push({ ms: p.red, type: 'redeem', code: p.code }); }
+    if (p.ch === 'LINE') line++;
+    fails += Number(p.fails) || 0;
+    var first = Math.min.apply(null, ts);
+    firsts.push(first);
+    if (cnt >= 3) durs.push((Math.max.apply(null, ts) - first) / 60000);
+  });
+
+  var n = firsts.length;
+  durs.sort(function (a, b) { return a - b; });
+  var median = durs.length ? Math.round(durs.length % 2 ? durs[(durs.length - 1) / 2] : (durs[durs.length / 2 - 1] + durs[durs.length / 2]) / 2) : null;
+  var pct = function (a) { return n ? Math.round((a * 1000) / n) / 10 : 0; };
+
+  // timeline ทุก 15 นาที
+  var nowMin = cfg.nowMs ? tod(cfg.nowMs) : null;
+  var all = firsts.concat(reds).map(tod);
+  var lo = Math.min.apply(null, [cfg.startMin != null ? cfg.startMin : 1050].concat(all));
+  var live = nowMin != null && nowMin >= lo;
+  var hi = Math.max.apply(null, [lo + step].concat(all).concat(live ? [nowMin] : [lo + step * 6]));
+  lo = Math.floor(lo / step) * step;
+  hi = Math.min(Math.floor(hi / step) * step, 1440 - step);
+  var labels = [], newB = [], redB = [];
+  for (var m = lo; m <= hi; m += step) { labels.push(hhmm(m)); newB.push(0); redB.push(0); }
+  var idx = function (ms) { return Math.max(0, Math.min(labels.length - 1, Math.floor((tod(ms) - lo) / step))); };
+  firsts.forEach(function (t) { newB[idx(t)]++; });
+  reds.forEach(function (t) { redB[idx(t)]++; });
+  var cumP = [], cumR = [], a = 0, z = 0;
+  newB.forEach(function (v, i) { a += v; z += redB[i]; cumP.push(a); cumR.push(z); });
+
+  var recentFrom = cfg.nowMs ? cfg.nowMs - 15 * 60000 : Infinity;
+  events.sort(function (x, y) { return y.ms - x.ms; });
+
+  return {
+    totals: {
+      players: n,
+      redeemed: groups[3],
+      complete: groups[2] + groups[3],
+      waiting: groups[2],
+      completionPct: pct(groups[2] + groups[3]),
+      redeemPct: pct(groups[3]),
+      medianMinutes: median,
+      exitFails: fails,
+      line: line,
+      linePct: pct(line),
+      newPlayers15: firsts.filter(function (t) { return t > recentFrom; }).length,
+      redeemed15: reds.filter(function (t) { return t > recentFrom; }).length
+    },
+    groups: [
+      { key: 'g1', label: 'สแกน 1 บูธ', note: 'แล้วไม่เล่นต่อ', count: groups[0], pct: pct(groups[0]) },
+      { key: 'g2', label: 'สแกน 2 บูธ', note: 'แล้วไม่เล่นต่อ', count: groups[1], pct: pct(groups[1]) },
+      { key: 'g3', label: 'ครบ 3 บูธ', note: 'แต่ยังไม่แลกของ', count: groups[2], pct: pct(groups[2]) },
+      { key: 'g4', label: 'ครบ 3 บูธ', note: 'และแลกของแล้ว', count: groups[3], pct: pct(groups[3]) }
+    ],
+    booths: names.map(function (nm, i) { return { label: nm, count: booths[i], pct: pct(booths[i]) }; }),
+    timeline: { labels: labels, players: cumP, redeemed: cumR, newPlayers: newB, redeemedPer: redB, step: step },
+    recent: events.slice(0, 14).map(function (e) {
+      return { ms: e.ms, at: hhmm(tod(e.ms)), type: e.type, code: e.code, text: e.type === 'redeem' ? 'รับของที่ระลึกแล้ว' : 'ได้ Stamp ' + names[e.booth] };
+    })
+  };
+}
+/* ---- END SHARED ---- */
+
+/* ================================================================ SETUP & TOOLS (รันจาก Apps Script Editor) */
+
+function guardOwner_() {
+  const a = Session.getActiveUser().getEmail(), e = Session.getEffectiveUser().getEmail();
+  if (!a || a !== e) throw new Error('ฟังก์ชันนี้ต้องรันจาก Apps Script Editor โดยเจ้าของเท่านั้น');
+}
+
+function setup() {
+  guardOwner_();
+  const ss = ss_();
+  ss.setSpreadsheetTimeZone(TZ);
+  const navy = '#10294F';
+
+  // Players
+  const sh = ss.getSheetByName(SHEETS.PLAYERS) || ss.insertSheet(SHEETS.PLAYERS, 0);
+  if (sh.getLastRow() > 0) {
+    const cur = sh.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+    HEADERS.forEach(function (h, i) { if (cur[i] && cur[i] !== h) throw new Error('หัวคอลัมน์ Players ช่องที่ ' + (i + 1) + ' ต้องเป็น ' + h); });
+  }
+  sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setFontColor('#FFFFFF').setBackground(navy);
+  sh.setFrozenRows(1);
+  if (sh.getMaxRows() < MIN_PLAYER_ROWS + 1) sh.insertRowsAfter(sh.getMaxRows(), MIN_PLAYER_ROWS + 1 - sh.getMaxRows());
+  formatPlayerColumns_(sh, 2, sh.getMaxRows() - 1);
+
+  // Scans log
+  if (!ss.getSheetByName(SHEETS.SCANS)) {
+    const lg = ss.insertSheet(SHEETS.SCANS);
+    lg.getRange(1, 1, 1, 5).setValues([['Time', 'Code', 'Point', 'Result', 'Channel']]).setFontWeight('bold');
+    lg.setFrozenRows(1);
+  }
+
+  // Settings
+  const st = ss.getSheetByName(SHEETS.SETTINGS) || ss.insertSheet(SHEETS.SETTINGS);
+  st.getRange(1, 2, st.getMaxRows(), 1).setNumberFormat('@');
+  if (st.getLastRow() === 0) st.getRange(1, 1, 1, 3).setValues([['Key', 'Value', 'คำอธิบาย']]);
+  st.getRange(1, 1, 1, 3).setFontWeight('bold').setFontColor('#FFFFFF').setBackground(navy);
+  const have = {};
+  if (st.getLastRow() > 1) st.getRange(2, 1, st.getLastRow() - 1, 1).getValues().forEach(function (r) { have[String(r[0]).trim()] = 1; });
+  DEFAULT_SETTINGS.forEach(function (d) {
+    if (!have[d[0]]) st.appendRow([d[0], d[0] === 'PIN' ? String(Math.floor(100000 + Math.random() * 900000)) : d[1], d[2]]);
+  });
+  st.setColumnWidth(1, 160); st.setColumnWidth(2, 260); st.setColumnWidth(3, 380);
+
+  // 4 กลุ่ม (อัปเดตอัตโนมัติด้วย FILTER)
+  GROUP_SHEETS.forEach(function (name, i) {
+    const g = ss.getSheetByName(name) || ss.insertSheet(name);
+    g.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold').setFontColor('#FFFFFF').setBackground(navy);
+    const f = g.getRange(2, 1);
+    f.clearFormat();   // ช่องสูตรต้องไม่เป็นรูปแบบข้อความ ไม่อย่างนั้นสูตรจะไม่คำนวณ
+    f.setFormula('=IFERROR(FILTER(Players!A2:N, Players!J2:J="' + STATUS[i] + '"), "")');
+    g.setFrozenRows(1);
+    DATE_KEYS.forEach(function (k) { g.getRange(2, C[k], g.getMaxRows() - 1, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss'); });
+  });
+
+  // Summary
+  const sm = ss.getSheetByName(SHEETS.SUMMARY) || ss.insertSheet(SHEETS.SUMMARY, 0);
+  sm.getRange(1, 1, 12, 2).setValues([
+    ['สรุป Stamp Rally (อัปเดตอัตโนมัติ)', ''],
+    ['กลุ่ม', 'จำนวนคน'],
+    ['สแกน 1 บูธ แล้วไม่เล่นต่อ', '=COUNTIF(Players!J2:J,"' + STATUS[0] + '")'],
+    ['สแกน 2 บูธ แล้วไม่เล่นต่อ', '=COUNTIF(Players!J2:J,"' + STATUS[1] + '")'],
+    ['ครบ 3 บูธ แต่ไม่แลกของ', '=COUNTIF(Players!J2:J,"' + STATUS[2] + '")'],
+    ['ครบ 3 บูธ และแลกของแล้ว', '=COUNTIF(Players!J2:J,"' + STATUS[3] + '")'],
+    ['ผู้เล่นทั้งหมด', '=SUM(B3:B6)'],
+    ['', ''],
+    ['จำนวนคนต่อบูธ', ''],
+    ['บูธที่ 1', '=COUNTIFS(Players!D2:D,"<>",Players!M2:M,"")'],
+    ['บูธที่ 2', '=COUNTIFS(Players!E2:E,"<>",Players!M2:M,"")'],
+    ['บูธที่ 3', '=COUNTIFS(Players!F2:F,"<>",Players!M2:M,"")']
+  ]);
+  sm.getRange(1, 1, 1, 2).setFontWeight('bold');
+  sm.getRange(2, 1, 1, 2).setFontWeight('bold').setFontColor('#FFFFFF').setBackground(navy);
+  sm.setColumnWidth(1, 260); sm.setColumnWidth(2, 120);
+
+  ss.getSheets().forEach(function (x) {
+    if (['Sheet1', 'แผ่น1', 'ชีต1'].indexOf(x.getName()) > -1 && x.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(x);
+  });
+  secret_();
+  [CACHE_SETTINGS, CACHE_DASH].forEach(function (k) { CacheService.getScriptCache().remove(k); });
+  Logger.log('✅ Setup เสร็จ  PIN สำหรับ Dashboard = ' + getSettings_().PIN + '  (แก้ได้ในชีต Settings)');
+  Logger.log('ต่อไป: Deploy > New deployment > Web app (Execute as: Me | Who has access: Anyone)');
+  Logger.log('หน้าเว็บที่โฮสต์บน GitHub Pages: ใส่ลิงก์ในชีต Settings ช่อง APP_URL');
+}
+
+/** รหัสลูกค้าเก็บเป็นข้อความล้วน (@) และคอลัมน์เวลาเป็นวันที่ ตั้งแต่แถว from จำนวน n แถว */
+function formatPlayerColumns_(sh, from, n) {
+  if (!(n > 0)) return;
+  [C.code, C.mergedInto, C.phoneKey, C.phone4].forEach(function (col) { sh.getRange(from, col, n, 1).setNumberFormat('@'); });
+  DATE_KEYS.forEach(function (k) { sh.getRange(from, C[k], n, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss'); });
+}
+
+/** Prototype: ใส่ผู้เล่นตัวอย่าง ~450 คน ย้อนหลัง 95 นาทีจากตอนนี้ ให้ Dashboard ดูสมจริง */
+function seedDemoData() {
+  guardOwner_();
+  if (!isTrue_(getSettings_().PROTOTYPE_MODE)) throw new Error('ชีตนี้ตั้งเป็นโหมดใช้งานจริง (PROTOTYPE_MODE = FALSE) จึงไม่ใส่ข้อมูลตัวอย่าง ถ้าจะโชว์ลูกค้า ให้ตั้งเป็น TRUE ก่อน');
+  const sh = sheet_(SHEETS.PLAYERS), now = Date.now(), start = now - 95 * 60000, rows = [], used = {};
+  const rnd = function (a, b) { return a + Math.random() * (b - a); };
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    for (let i = 0; i < 450; i++) {
+      const arrive = start + Math.pow(Math.random(), 0.85) * (now - start);
+      const order = [1, 2, 3].sort(function () { return Math.random() - 0.5; });
+      let code = uniqueCode_(sh);
+      while (used[code]) code = uniqueCode_(sh);
+      used[code] = 1;
+      const p = blankPlayer_(code, new Date(arrive), Math.random() < 0.85 ? 'LINE' : 'WEB');
+      let t = arrive;
+      for (let k = 0; k < 3; k++) {
+        if (k === 1 && Math.random() > 0.86) break;
+        if (k === 2 && Math.random() > 0.9) break;
+        if (k > 0) t += rnd(6, 16) * 60000;
+        if (t > now) break;
+        p['b' + order[k]] = new Date(t);
+        if (k === 0) p.firstBooth = 'B' + order[k];
+      }
+      if (countStamps_(p) === 3 && Math.random() < 0.92) { const r = t + rnd(3, 18) * 60000; if (r <= now) p.redeemedAt = new Date(r); }
+      p.lastScanAt = new Date(Math.min(now, t));
+      recompute_(p);
+      rows.push(toRow_(p));
+    }
+    writeRows_(sh, rows);
+  } finally { lock.releaseLock(); }
+  CacheService.getScriptCache().remove(CACHE_DASH);
+  Logger.log('ใส่ผู้เล่นตัวอย่าง 450 คนแล้ว');
+}
+
+/** ล้างข้อมูลผู้เล่นทั้งหมด (ใช้ก่อนวันงานจริง) — ไม่ลบ Settings */
+function clearAllData() {
+  guardOwner_();
+  // ล้างแค่เนื้อหา คงแถวและรูปแบบคอลัมน์ไว้
+  [[SHEETS.PLAYERS, COLS.length], [SHEETS.SCANS, 5]].forEach(function (x) {
+    const sh = ss_().getSheetByName(x[0]);
+    if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, x[1]).clearContent();
+  });
+  CacheService.getScriptCache().remove(CACHE_DASH);
+  Logger.log('ล้างข้อมูลผู้เล่นแล้ว');
+}
+
+function onEdit(e) {
+  try {
+    if (e && e.range && e.range.getSheet().getName() === SHEETS.SETTINGS) CacheService.getScriptCache().remove(CACHE_SETTINGS);
+  } catch (err) { /* simple trigger */ }
+}

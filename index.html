@@ -53,6 +53,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-
 .sheet h2{font-size:22px;font-weight:600;line-height:1.3}
 .sheet .lead{color:var(--ink-2);font-size:15px;margin-top:6px}
 .c-foot{padding:18px 20px 26px;text-align:center;color:var(--muted);font-size:12px}
+.tel-form{margin-top:16px}
+.tel-label{display:block;font-size:13.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.tel-input{height:58px;font-size:24px;font-weight:600;letter-spacing:.06em;text-align:center}
+.tel-err{margin-top:8px;color:var(--danger,#C0392B);font-size:14px}
+.tel-note{margin-top:12px;font-size:12.5px;color:var(--muted);text-align:center}
+.tel-chip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:var(--primary-soft);color:var(--primary);font-weight:600;font-size:13.5px;padding:6px 12px;margin-bottom:10px}
+.tel-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;font-size:13.5px;color:var(--muted)}
+.tel-row b{color:var(--ink)}
 .c-toasts{position:sticky;bottom:14px;z-index:20;display:grid;gap:8px;padding:0 14px;pointer-events:none}
 
 /* stamp card */
@@ -271,7 +279,7 @@ const TEXT = {
   exitOk: ['ขอบคุณที่มาร่วมเป็นส่วนหนึ่งของ {event} ค่ะ', 'คุณสะสม Stamp ครบ 3 ดวงเรียบร้อยแล้ว แสดงหน้าจอนี้กับเจ้าหน้าที่เพื่อรับของที่ระลึกได้เลยค่ะ'],
   exitIncomplete: ['ขอบคุณที่แวะมาร่วมสนุกนะคะ', 'ตอนนี้คุณมี Stamp {n} จาก 3 ดวง ยังขาดอีก{missing} สะสมให้ครบแล้วกลับมารับของที่ระลึกได้เลยค่ะ'],
   already: ['รหัสนี้รับของที่ระลึกไปแล้วค่ะ', 'รับเมื่อเวลา {time} น. ขอบคุณที่มาร่วมสนุกกับเราค่ะ'],
-  noCard: ['ยังไม่พบ Stamp ในเครื่องนี้ค่ะ', 'เริ่มสะสม Stamp ได้ที่บูธที่ 1, 2 และ 3 แล้วกลับมารับของที่ระลึกนะคะ'],
+  noCard: ['ยังไม่พบ Stamp ของเบอร์ลงท้าย {tel4} ค่ะ', 'ตรวจสอบว่าเป็นเบอร์เดียวกับที่ใช้ตอนสะสม Stamp หรือเริ่มสะสมได้ที่บูธที่ 1, 2 และ 3 แล้วกลับมารับของที่ระลึกนะคะ'],
   badQr: ['QR นี้ใช้ไม่ได้ค่ะ', 'กรุณาสแกนจากป้ายในงาน']
 };
 
@@ -466,7 +474,11 @@ const Demo = (() => {
   const real = (p, t) => ({ code: p.code, ch: p.ch, b: p.b.map(x => (x && x <= t ? x : null)), red: p.red && p.red <= t ? p.red : null, fails: p.fails.filter(x => x <= t).length, mergedInto: p.mergedInto });
   const count = p => p.b.filter(Boolean).length;
   const status = p => (p.mergedInto ? 'รวมกับ ' + p.mergedInto : p.red ? 'แลกของแล้ว' : count(p) >= 3 ? 'ครบ 3 บูธ ยังไม่แลก' : count(p) ? 'สแกน ' + count(p) + ' บูธ' : '');
-  const cardOut = (p, t) => { const r = real(p, t); return { code: p.code, key: cardKey(p.code), stamps: r.b, count: count(r), redeemedAt: r.red, channel: p.ch }; };
+  const cardOut = (p, t) => { const r = real(p, t); return { code: p.code, key: cardKey(p.code), stamps: r.b, count: count(r), redeemedAt: r.red, channel: p.ch, tel4: p.tel4 || '' }; };
+  const normTel = v => { let d = String(v || '').replace(/\D/g, ''); if (/^66\d{9}$/.test(d)) d = '0' + d.slice(2); return /^0\d{9}$/.test(d) ? d : ''; };
+  const telKey = tel => sign('tel|' + tel);
+  const byTel = tel => { let p = db.players.find(x => x.tk === telKey(tel)); if (p && p.mergedInto) p = find(p.mergedInto) || p; return p || null; };
+  const cardFor = (code, key, tel) => { const dev = findCard(code, key); if (!tel) return dev; const bt = byTel(tel); if (bt) return bt; return dev && !dev.tk ? dev : null; };
   const ok = (data, message = '', code = 'OK') => ({ success: true, code, message, data: JSON.parse(JSON.stringify(data)) });
   const fail = (code, message, data = null) => ({ success: false, code, message, data });
   const find = c => db.players.find(p => p.code === c);
@@ -492,16 +504,20 @@ const Demo = (() => {
       case 'scan': {
         const pt = parsePoint(req.s);
         if (!pt) return fail('BAD_QR', TEXT.badQr.join(' '));
-        let p = findCard(req.code, req.key), result;
+        const tel = normTel(req.tel);
+        if (req.tel && !tel) return fail('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
+        let p = cardFor(req.code, req.key, tel), result;
+        if (!p && !tel) return ok({ result: 'NEED_TEL', point: pt });
         if (p) freeze(p, t);
         if (pt === 'EX') {
-          if (!p) return ok({ result: 'NO_CARD', point: pt });
+          if (!p) return ok({ result: 'NO_CARD', point: pt, tel4: tel.slice(-4) });
           if (p.red) result = 'ALREADY';
           else if (count(p) < 3) { p.fails.push(t); result = 'INCOMPLETE'; }
           else { p.red = t; result = 'REDEEMED'; }
         } else {
           const i = Number(pt[1]) - 1;
           if (!p) { p = { code: newCode(used()), ch: req.ch === 'LINE' ? 'LINE' : 'WEB', b: [null, null, null], red: null, fails: [], mergedInto: '', mine: true }; db.players.push(p); }
+          if (tel && !p.tk) { p.tk = telKey(tel); p.tel4 = tel.slice(-4); }
           if (p.red) result = 'ALREADY';
           else if (p.b[i]) result = 'DUP';
           else { p.b[i] = t; result = 'NEW_STAMP'; }
@@ -509,7 +525,7 @@ const Demo = (() => {
         saveNow(); emit();
         return ok({ result, point: pt, card: cardOut(p, t) });
       }
-      case 'state': { const p = findCard(req.code, req.key); return p ? ok({ card: cardOut(p, t) }) : fail('NOT_FOUND', 'ไม่พบบัตรในเครื่องนี้'); }
+      case 'state': { const tel = normTel(req.tel); const p = cardFor(req.code, req.key, tel); return p ? ok({ card: cardOut(p, t) }) : fail('NOT_FOUND', tel ? 'ยังไม่มีบัตรของเบอร์นี้ สแกน QR ที่บูธเพื่อเริ่มสะสมได้เลยค่ะ' : 'ไม่พบบัตรในเครื่องนี้'); }
       case 'merge': {
         const target = String(req.target || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (!/^[A-Z][A-Z0-9]{4}$/.test(target)) return fail('INVALID', 'รหัสมี 5 ตัว เช่น K7Q2X');
@@ -637,31 +653,70 @@ setInterval(() => { const t = nowMs(); $$('[data-clock]').forEach(el => { el.tex
    CUSTOMER — หน้าจอมือถือของลูกค้า
    ===================================================================== */
 const CARD_KEY = 'axs_card';
+/* บัตรสะสมเก็บ 3 ที่: ในหน้าที่เปิดอยู่ (หลักเมื่อสแกนด้วยปุ่มในหน้า) + localStorage + cookie สำรอง */
+const CardStore = {
+  ok(c) { return c && /^[A-Z][A-Z0-9]{4}$/.test(c.code || '') && /^[A-Za-z0-9_-]{6,24}$/.test(c.key || '') ? { code: c.code, key: c.key } : null; },
+  read() {
+    const ls = this.ok(store.get(CARD_KEY, null));
+    if (ls) return ls;
+    try {
+      const m = document.cookie.match(/(?:^|;\s*)axs_card=([^;]+)/);
+      if (m) { const [code, key] = decodeURIComponent(m[1]).split('.'); return this.ok({ code, key }); }
+    } catch (e) { /* cookie ปิด */ }
+    return null;
+  },
+  write(c) {
+    c = this.ok(c); if (!c) return;
+    store.set(CARD_KEY, c);
+    try { document.cookie = 'axs_card=' + encodeURIComponent(c.code + '.' + c.key) + '; Max-Age=259200; Path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); } catch (e) { /* ignore */ }
+  },
+  clear() {
+    store.del(CARD_KEY);
+    try { document.cookie = 'axs_card=; Max-Age=0; Path=/'; } catch (e) { /* ignore */ }
+  }
+};
+
 class Cust {
   constructor(root, { embedded = false, channel } = {}) {
     this.root = root; this.embedded = embedded; this.channel = channel || (IS_LINE ? 'LINE' : 'WEB');
     root.innerHTML = '<div class="cust' + (embedded ? ' embedded' : '') + '"><header class="c-head"><div class="c-smile">' + ICON.smile + '</div><img class="logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club"><h1 class="c-title">' + esc(CONFIG.TITLE) + '</h1><p class="c-sub">' + esc(CONFIG.SUBTITLE) + '</p></header><main class="c-body"><section class="sheet" data-sheet aria-live="polite"></section></main><footer class="c-foot">' + esc(State.config.eventName) + '</footer><div class="c-toasts" data-toasts></div></div>';
     this.el = $('.cust', root); this.sheet = $('[data-sheet]', root); this.toasts = $('[data-toasts]', root);
   }
-  get card() { return store.get(CARD_KEY, null); }
-  saveCard(c) { if (c) store.set(CARD_KEY, { code: c.code, key: c.key }); }
+  // บัตรในหน้าที่เปิดอยู่มาก่อน เผื่อเบราว์เซอร์ไม่เก็บข้อมูลข้ามหน้า
+  get card() { return this.mem || CardStore.read(); }
+  saveCard(c) { if (c) { this.mem = CardStore.ok(c); CardStore.write(c); } }
+  forget() { this.mem = null; CardStore.clear(); }
+  fmtTel(d) { d = String(d || '').replace(/\D/g, '').slice(0, 10); return d.length > 6 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; }
+  normTel(v) { let d = String(v || '').replace(/\D/g, ''); if (/^66\d{9}$/.test(d)) d = '0' + d.slice(2); return /^0\d{9}$/.test(d) ? d : ''; }
   top() { if (this.embedded) this.el.scrollTop = 0; else window.scrollTo(0, 0); }
   names() { return State.config.boothNames || CONFIG.BOOTH_NAMES; }
   loading(text) { this.sheet.innerHTML = '<div class="flex items-center justify-center gap-3 py-12 muted"><span class="spin"></span>' + esc(text) + '</div>'; }
-  async scan(s, rid) {
+  async scan(s, rid, tel) {
     // rid: รหัสของการสแกนครั้งนี้ ถ้าต้องส่งซ้ำ (เน็ตหลุด / กดลองอีกครั้ง) ระบบจะตอบผลเดิม
     rid = rid || (Math.random().toString(36).slice(2, 10) + Date.now().toString(36));
     this.top(); this.loading('กำลังบันทึก…');
     const me = this.card || {};
     try {
-      const r = await Backend.call('scan', { s, code: me.code, key: me.key, ch: this.channel, rid });
+      const r = await Backend.call('scan', { s, code: me.code, key: me.key, tel: tel || undefined, ch: this.channel, rid });
+      if (!r.success && r.code === 'BAD_TEL') return this.render({ kind: 'tel', s, error: r.message });
+      if (!r.success) return this.render({ kind: r.code === 'BAD_QR' ? 'bad' : 'error', message: r.message, retry: r.code === 'BAD_QR' ? null : () => this.scan(s, rid, tel) });
+      // เครื่องจำบัตรไม่ได้ → ขอเบอร์มือถือ (บัตรผูกกับเบอร์ ล้างเบราว์เซอร์ก็กลับมาได้)
+      if (r.data.result === 'NEED_TEL') return this.render({ kind: 'tel', s });
       if (!this.embedded) Backend.replaceParams({ p: 'card' });
-      if (!r.success) return this.render({ kind: r.code === 'BAD_QR' ? 'bad' : 'error', message: r.message, retry: r.code === 'BAD_QR' ? null : () => this.scan(s, rid) });
       if (r.data.card) this.saveCard(r.data.card);
-      this.render({ kind: r.data.point === 'EX' ? 'exit' : 'booth', result: r.data.result, card: r.data.card, point: r.data.point });
+      this.render({ kind: r.data.point === 'EX' ? 'exit' : 'booth', result: r.data.result, card: r.data.card, point: r.data.point, tel4: r.data.tel4, s });
     } catch (e) {
-      this.render({ kind: 'error', message: 'เชื่อมต่อไม่ได้ กรุณาลองอีกครั้งค่ะ', retry: () => this.scan(s, rid) });
+      this.render({ kind: 'error', message: 'เชื่อมต่อไม่ได้ กรุณาลองอีกครั้งค่ะ', retry: () => this.scan(s, rid, tel) });
     }
+  }
+  async lookup(tel) {
+    this.top(); this.loading('กำลังค้นหาบัตร…');
+    try {
+      const r = await Backend.call('state', { tel });
+      if (!r.success) return this.render({ kind: 'intro', lookupError: r.message, showLookup: true });
+      this.saveCard(r.data.card);
+      this.render({ kind: 'card', card: r.data.card });
+    } catch (e) { this.render({ kind: 'error', message: 'เชื่อมต่อไม่ได้ กรุณาลองอีกครั้ง', retry: () => this.lookup(tel) }); }
   }
   async open() {
     const me = this.card;
@@ -669,7 +724,9 @@ class Cust {
     this.loading('กำลังเปิดบัตร…');
     try {
       const r = await Backend.call('state', { code: me.code, key: me.key });
-      if (!r.success) { store.del(CARD_KEY); return this.render({ kind: 'intro' }); }
+      if (!r.success && r.code === 'NOT_FOUND') { this.forget(); return this.render({ kind: 'intro' }); }
+      if (!r.success) return this.render({ kind: 'error', message: r.message || 'ระบบไม่ว่าง กรุณาลองอีกครั้ง', retry: () => this.open() });
+      this.saveCard(r.data.card);
       this.render({ kind: 'card', card: r.data.card });
     } catch (e) { this.render({ kind: 'error', message: 'เชื่อมต่อไม่ได้ กรุณาลองอีกครั้ง', retry: () => this.open() }); }
   }
@@ -687,13 +744,28 @@ class Cust {
   }
   hint(card) {
     if (!card || card.redeemedAt) return '';
-    const app = card.channel === 'LINE' ? 'LINE' : 'กล้องมือถือ';
-    const where = card.count >= 3 ? 'สแกนจุดรับของที่ระลึก' : 'บูธต่อไปสแกน';
-    return '<div class="hint">' + ICON.phone + '<span>' + where + 'ด้วย<b> ' + app + ' </b>เหมือนเดิมนะคะ Stamp จะได้อยู่ในบัตรใบเดียวกัน</span></div>';
+    const t4 = card.tel4 ? ' ลงท้าย <b>' + esc(card.tel4) + '</b>' : '';
+    const where = card.count >= 3 ? 'ไปสแกน QR ที่<b>ประตูทางออก</b>ด้วยกล้องได้เลย' : 'บูธต่อไปสแกน QR ด้วย<b>กล้องมือถือ</b>ได้เลย';
+    return '<div class="hint">' + ICON.phone + '<span>' + where + ' ถ้าระบบถามเบอร์ ให้กรอกเบอร์เดิม' + t4 + ' Stamp จะรวมอยู่ในบัตรใบเดียวกันค่ะ</span></div>';
   }
-  codeRow(card, showMerge = true) {
-    return (card ? '<div class="code-row"><span>รหัสของคุณ</span><b class="tnum">' + esc(card.code) + '</b></div>' : '') +
-      (showMerge ? '<div class="mt-3 text-center"><button type="button" class="btn-link text-[13px]" data-merge-toggle>Stamp ที่เคยสะสมไว้ไม่ขึ้น?</button></div><div class="merge" data-merge hidden><p>ถ้าเคยสแกนด้วยแอปอื่น ให้เปิดแอปนั้นดูรหัส 5 ตัวใต้บัตร แล้วใส่ที่นี่เพื่อรวม Stamp เป็นใบเดียว</p><div class="flex gap-2 mt-3"><input class="input code-input" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="K7Q2X" aria-label="รหัสบัตรเดิม" data-merge-input><button type="button" class="btn btn-navy" data-merge-go>รวม Stamp</button></div></div>' : '');
+  telForm(s, error) {
+    const ex = s && String(s).startsWith('EX'), pt = s ? String(s).slice(0, 2) : '', idx = /^B[123]$/.test(pt) ? Number(pt[1]) - 1 : -1;
+    const chip = ex ? 'จุดรับของที่ระลึก' : idx > -1 ? 'สะสม Stamp ' + this.names()[idx] : '';
+    const demoTel = this.embedded ? '08' + String(Math.floor(10000000 + Math.random() * 89999999)) : '';
+    return (chip ? '<div class="tel-chip">' + esc(chip) + '</div>' : '') +
+      '<h2>' + (ex ? 'กรอกเบอร์มือถือเพื่อรับของที่ระลึก' : s ? 'กรอกเบอร์มือถือเพื่อสะสม Stamp' : 'ดูบัตรสะสมด้วยเบอร์มือถือ') + '</h2>' +
+      '<p class="lead">' + (s ? 'ใช้เบอร์เดิมทุกครั้งที่ระบบถาม Stamp จะรวมอยู่ในบัตรใบเดียวกัน แม้เปลี่ยนแอปหรือล้างเบราว์เซอร์' : 'กรอกเบอร์ที่ใช้ตอนสะสม Stamp') + '</p>' +
+      '<form class="tel-form" data-tel-form novalidate><label class="tel-label" for="tel-input">เบอร์มือถือ</label>' +
+      '<input id="tel-input" class="input tel-input tnum" type="tel" inputmode="numeric" autocomplete="tel" maxlength="12" placeholder="08x-xxx-xxxx" value="' + esc(this.fmtTel(demoTel)) + '" data-tel-input>' +
+      '<p class="tel-err" data-tel-err' + (error ? '' : ' hidden') + '>' + esc(error || '') + '</p>' +
+      '<button type="submit" class="btn btn-primary w-full mt-3" data-tel-go>' + (ex ? 'ตรวจสอบ Stamp' : s ? 'รับ Stamp' : 'ดูบัตรของฉัน') + '</button></form>' +
+      '<p class="tel-note">ระบบเก็บเบอร์แบบเข้ารหัส ใช้เพื่อจำบัตรสะสมของคุณเท่านั้น</p>';
+  }
+  codeRow(card) {
+    if (!card) return '';
+    return '<div class="code-row"><span>รหัสของคุณ</span><b class="tnum">' + esc(card.code) + '</b></div>' +
+      (card.tel4 ? '<div class="tel-row"><span>เบอร์มือถือ</span><b class="tnum">xxx-xxx-' + esc(card.tel4) + '</b></div>' : '') +
+      '<div class="mt-3 text-center"><button type="button" class="btn-link text-[13px]" data-forget>ไม่ใช่บัตรของคุณ? ใช้เบอร์อื่น</button></div>';
   }
   tx(s, vars = {}) {
     const v = Object.assign({ event: State.config.eventName || CONFIG.EVENT_NAME }, vars);
@@ -708,7 +780,8 @@ class Cust {
     this.top();
     const c = s.card;
     let h = '';
-    if (s.kind === 'intro') h = this.msg(TEXT.intro) + this.cardHTML(null) + this.codeRow(null);
+    if (s.kind === 'intro') h = this.msg(TEXT.intro) + this.cardHTML(null) + (s.showLookup ? '<div class="mt-5">' + this.telForm(null, s.lookupError) + '</div>' : '<div class="mt-4 text-center"><button type="button" class="btn-link text-[14px]" data-show-lookup>เคยสะสมแล้ว? ดูบัตรด้วยเบอร์มือถือ</button></div>');
+    else if (s.kind === 'tel') h = this.telForm(s.s, s.error);
     else if (s.kind === 'bad') h = '<div class="notice">' + this.msg(TEXT.badQr) + '</div>';
     else if (s.kind === 'error') h = '<div class="notice"><h2>ยังบันทึกไม่ได้</h2><p>' + esc(s.message) + '</p>' + (s.retry ? '<button type="button" class="btn btn-navy mt-4" data-retry>ลองอีกครั้ง</button>' : '') + '</div>';
     else if (s.kind === 'booth' || s.kind === 'card') {
@@ -723,36 +796,31 @@ class Cust {
         h = this.msg(pair) + this.cardHTML(c, { newIndex: fresh ? idx : -1, pop: fresh && cnt === 3 }) + this.hint(c) + this.codeRow(c);
       }
     } else if (s.kind === 'exit') {
-      if (s.result === 'NO_CARD') h = '<div class="notice">' + this.msg(TEXT.noCard) + '<p class="text-[14px] mt-3">ถ้าเคยสะสมไว้แล้ว ให้สแกนจุดนี้อีกครั้งด้วยแอปเดิมที่ใช้ตอนสะสม Stamp</p></div>' + this.codeRow(null);
+      if (s.result === 'NO_CARD') h = '<div class="notice">' + this.msg(TEXT.noCard, { tel4: s.tel4 || '' }) + '</div><button type="button" class="btn btn-navy w-full mt-4" data-retel>กรอกเบอร์อีกครั้ง</button>';
       else if (s.result === 'INCOMPLETE') h = '<div class="notice">' + this.msg(TEXT.exitIncomplete, { n: c.count, missing: this.missingText(c) }) + '</div>' + this.cardHTML(c, { highlightMissing: true }) + this.hint(c) + this.codeRow(c);
       else if (s.result === 'REDEEMED') h = '<div class="redeem ok"><div class="badge-ok">' + ICON.okBig + '</div><h2>' + esc(this.tx(TEXT.exitOk[0])) + '</h2><p>' + esc(this.tx(TEXT.exitOk[1])) + '</p><div class="live-clock tnum" data-clock>' + hms(nowMs()) + '</div><div class="redeem-meta">รหัส <b>' + esc(c.code) + '</b><br>บันทึกการรับเมื่อ ' + hm(c.redeemedAt) + ' น.</div></div>' + this.cardHTML(c);
       else h = this.redeemedHTML(c);
     }
     this.sheet.innerHTML = h;
     const rt = $('[data-retry]', this.sheet); if (rt) rt.onclick = s.retry;
-    const mt = $('[data-merge-toggle]', this.sheet);
-    if (mt) {
-      mt.onclick = () => { const box = $('[data-merge]', this.sheet); box.hidden = !box.hidden; if (!box.hidden) $('[data-merge-input]', box).focus(); };
-      $('[data-merge-go]', this.sheet).onclick = e => this.merge(e.currentTarget);
-      $('[data-merge-input]', this.sheet).addEventListener('keydown', e => { if (e.key === 'Enter') this.merge($('[data-merge-go]', this.sheet)); });
+    const fg = $('[data-forget]', this.sheet); if (fg) fg.onclick = () => { this.forget(); this.render({ kind: 'intro', showLookup: false }); toast('ออกจากบัตรนี้แล้ว สแกน QR ที่บูธแล้วกรอกเบอร์ของคุณได้เลย', 'ok', this.toasts); };
+    const sl = $('[data-show-lookup]', this.sheet); if (sl) sl.onclick = () => this.render({ kind: 'intro', showLookup: true });
+    const rtl = $('[data-retel]', this.sheet); if (rtl) rtl.onclick = () => this.render({ kind: 'tel', s: s.s });
+    const tf = $('[data-tel-form]', this.sheet);
+    if (tf) {
+      const inp = $('[data-tel-input]', tf), err = $('[data-tel-err]', tf);
+      inp.addEventListener('input', () => { const pos = inp.value; inp.value = this.fmtTel(pos); err.hidden = true; });
+      if (!this.embedded) setTimeout(() => { try { inp.focus(); } catch (e) { /* ignore */ } }, 250);
+      tf.onsubmit = e => {
+        e.preventDefault();
+        const tel = this.normTel(inp.value);
+        if (!tel) { err.textContent = 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 081-234-5678'; err.hidden = false; inp.focus(); return; }
+        if (s.kind === 'tel' && s.s) this.scan(s.s, null, tel); else this.lookup(tel);
+      };
     }
   }
   redeemedHTML(c) {
     return '<div class="redeem done"><div class="badge-ok">' + ICON.gift + '</div><h2>' + esc(this.tx(TEXT.already[0])) + '</h2><p>' + esc(this.tx(TEXT.already[1], { time: hm(c.redeemedAt) })) + '</p><div class="redeem-meta">รหัส <b>' + esc(c.code) + '</b></div></div>' + this.cardHTML(c);
-  }
-  async merge(btn) {
-    const target = $('[data-merge-input]', this.sheet).value.trim().toUpperCase();
-    if (!/^[A-Z][A-Z0-9]{4}$/.test(target)) return toast('ใส่รหัส 5 ตัว เช่น K7Q2X', 'err', this.toasts);
-    const me = this.card || {};
-    setBusy(btn, true, 'กำลังรวม…');
-    try {
-      const r = await Backend.call('merge', { code: me.code, key: me.key, target });
-      if (!r.success) return toast(r.message, 'err', this.toasts);
-      this.saveCard(r.data.card);
-      this.render({ kind: 'card', card: r.data.card });
-      toast('รวม Stamp แล้ว', 'ok', this.toasts);
-    } catch (e) { toast('เชื่อมต่อไม่ได้ ลองอีกครั้ง', 'err', this.toasts); }
-    finally { setBusy(btn, false); }
   }
 }
 
@@ -896,7 +964,7 @@ class Dash {
    EXPORT
    ===================================================================== */
 const Exporter = {
-  cols: [['รหัส', 'code'], ['เริ่มเล่น', 'createdAt'], ['บูธแรก', 'firstBooth'], ['เวลา บูธที่ 1', 'b1'], ['เวลา บูธที่ 2', 'b2'], ['เวลา บูธที่ 3', 'b3'], ['จำนวน Stamp', 'stamps'], ['ครบ 3 บูธเมื่อ', 'completedAt'], ['รับของเมื่อ', 'redeemedAt'], ['สถานะ', 'status'], ['ช่องทาง', 'channel'], ['สแกนจุดรับของตอนยังไม่ครบ (ครั้ง)', 'exitFails']],
+  cols: [['รหัส', 'code'], ['เริ่มเล่น', 'createdAt'], ['บูธแรก', 'firstBooth'], ['เวลา บูธที่ 1', 'b1'], ['เวลา บูธที่ 2', 'b2'], ['เวลา บูธที่ 3', 'b3'], ['จำนวน Stamp', 'stamps'], ['ครบ 3 บูธเมื่อ', 'completedAt'], ['รับของเมื่อ', 'redeemedAt'], ['สถานะ', 'status'], ['ช่องทาง', 'channel'], ['สแกนจุดรับของตอนยังไม่ครบ (ครั้ง)', 'exitFails'], ['เบอร์ 4 ตัวท้าย', 'phone4']],
   groups: [['กลุ่ม1 สแกน 1 บูธ', 'สแกน 1 บูธ'], ['กลุ่ม2 สแกน 2 บูธ', 'สแกน 2 บูธ'], ['กลุ่ม3 ครบ ยังไม่แลก', 'ครบ 3 บูธ ยังไม่แลก'], ['กลุ่ม4 แลกของแล้ว', 'แลกของแล้ว']],
   aoa(rows, names) {
     const fb = { B1: names[0], B2: names[1], B3: names[2] };
@@ -1058,7 +1126,7 @@ const Views = {
     const phone = new Cust($('[data-phone]'), { embedded: true, channel: 'LINE' });
     phone.open();
     $$('[data-pt]').forEach(b => b.onclick = () => phone.scan(pts[Number(b.dataset.pt)].s));
-    $('[data-newcust]').onclick = () => { store.del(CARD_KEY); phone.open(); toast('เริ่มเป็นลูกค้าคนใหม่แล้ว'); };
+    $('[data-newcust]').onclick = () => { phone.forget(); phone.open(); toast('เริ่มเป็นลูกค้าคนใหม่แล้ว'); };
     const d = new Dash($('[data-dash]'), { session, embedded: true });
     d.onUpdate = x => { $('[data-live]').textContent = 'Live  ' + hm(x.generatedAt) + ' น.'; };
     d.start();
@@ -1079,7 +1147,7 @@ const Views = {
       gasSim = setInterval(tick, 4000); tick(); setSim(true);
     };
     const rs = $('[data-reset]');
-    if (rs) rs.onclick = () => { Demo.reset(); setSim(false); store.del(CARD_KEY); phone.open(); toast('รีเซ็ตข้อมูลตัวอย่างแล้ว'); };
+    if (rs) rs.onclick = () => { Demo.reset(); setSim(false); phone.forget(); phone.open(); toast('รีเซ็ตข้อมูลตัวอย่างแล้ว'); };
     if (demo) { const clk = () => { $('[data-clock-label]').textContent = 'เวลาในงานจำลอง ' + hm(Demo.clock()) + ' น.'; }; clk(); setInterval(clk, 1000); }
   }
 };
