@@ -83,7 +83,6 @@ function route_(req) {
       case 'config': return ok_(publicConfig_(getSettings_()));
       case 'scan': return scan_(req);
       case 'state': return state_(req);
-      case 'merge': return merge_(req);
       case 'login': return login_(req);
       case 'session': return session_(req);
       case 'dashboard': return dashboard_(req);
@@ -100,11 +99,19 @@ function route_(req) {
 
 /* ================================================================ CUSTOMER */
 
-/** สแกน QR บูธ (B1–B3) หรือจุดรับของ (EX) */
+/** สแกน QR บูธ (B1–B3) หรือจุดรับของ (EX)
+ *  ข้อมูลบัตรอ่าน/เขียนที่ Script Properties ภายใน Lock (เร็ว ~0.2 วินาที) แล้วค่อยเขียนแถวในชีต + บันทึกการสแกนนอก Lock
+ *  ทำให้รับคนสแกนพร้อมกันได้มากขึ้นหลายเท่า */
 function scan_(req) {
   const pt = parsePoint_(req.s);
   if (!pt) return fail_('BAD_QR', 'QR นี้ใช้ไม่ได้ค่ะ กรุณาสแกนจากป้ายในงาน');
   const ch = req.ch === 'LINE' ? 'LINE' : 'WEB';
+  const tel = normTel_(req.tel);
+  if (req.tel && !tel) return fail_('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
+  const code = String(req.code || '').toUpperCase();
+  const devOk = !!code && !!req.key && req.key === cardKey_(code);
+  // เครื่องไม่มีบัตร และยังไม่กรอกเบอร์ → ขอเบอร์ทันที ไม่ต้องเข้าคิว
+  if (!devOk && !tel) return ok_({ result: 'NEED_TEL', point: pt });
   // rid = รหัสของการสแกนครั้งนั้น ถ้าเน็ตหลุดแล้วหน้าเว็บส่งซ้ำ จะได้ผลเดิม (ไม่กลายเป็น "รับไปแล้ว")
   const rid = String(req.rid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 32);
   const cache = CacheService.getScriptCache(), ridKey = rid.length >= 8 ? 'scan_' + rid : '';
@@ -112,42 +119,42 @@ function scan_(req) {
   let out = replay();
   if (out) return out;
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(20000)) return fail_('BUSY', 'มีผู้สแกนพร้อมกันจำนวนมาก กรุณาสแกนอีกครั้งค่ะ');
-  let result, p, now = new Date();
+  if (!lock.tryLock(25000)) return fail_('BUSY', 'มีผู้สแกนพร้อมกันจำนวนมาก กรุณาสแกนอีกครั้งค่ะ');
+  let result = '', p = null;
+  const now = new Date();
   try {
     out = replay();
     if (out) return out;
-    const sh = sheet_(SHEETS.PLAYERS);
-    const tel = normTel_(req.tel);
-    if (req.tel && !tel) return fail_('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
-    const found = cardFor_(sh, req.code, req.key, tel);
-    p = found.p;
-    let row = found.row;
-    // บัตรผูกกับเบอร์มือถือ: เครื่องจำบัตรไม่ได้ (เปลี่ยนแอป/ล้างเบราว์เซอร์) → ขอเบอร์ก่อน ไม่สร้างบัตรใหม่มั่ว
-    if (!p && !tel) { logScan_(now, '', pt, 'NEED_TEL', ch); return ok_({ result: 'NEED_TEL', point: pt }); }
-
-    if (pt === 'EX') {
-      if (!p) { logScan_(now, '', pt, 'NO_CARD', ch); return ok_({ result: 'NO_CARD', point: pt, tel4: tel.slice(-4) }); }
-      if (p.redeemedAt) result = 'ALREADY';
-      else if (countStamps_(p) < 3) { p.exitFails = (Number(p.exitFails) || 0) + 1; result = 'INCOMPLETE'; }
-      else { p.redeemedAt = now; result = 'REDEEMED'; }
-    } else {
-      const k = 'b' + pt.charAt(1);
-      if (!p) { p = newPlayer_(sh, now, ch); row = 0; }
-      if (tel && !p.phoneKey) { p.phoneKey = phoneKey_(tel); p.phone4 = tel.slice(-4); }
-      if (p.redeemedAt) result = 'ALREADY';
-      else if (p[k]) result = 'DUP';
-      else { p[k] = now; if (!p.firstBooth) p.firstBooth = pt; result = 'NEW_STAMP'; }
+    p = cardFor_(code, req.key, tel);
+    if (!p && !tel) out = ok_({ result: 'NEED_TEL', point: pt });          // บัตรในเครื่องถูกล้างไปแล้ว
+    else if (pt === 'EX' && !p) out = ok_({ result: 'NO_CARD', point: pt, tel4: tel.slice(-4) });
+    else {
+      const pr = props_(), extra = {};
+      if (pt === 'EX') {
+        if (p.redeemedAt) result = 'ALREADY';
+        else if (countStamps_(p) < 3) { p.exitFails = (Number(p.exitFails) || 0) + 1; result = 'INCOMPLETE'; }
+        else { p.redeemedAt = now; result = 'REDEEMED'; }
+      } else {
+        const k = 'b' + pt.charAt(1);
+        if (!p) {
+          p = blankPlayer_(uniqueCode_(pr), now, ch);
+          p.row = Number(pr.getProperty(KEY_NEXT_ROW)) || (sheet_(SHEETS.PLAYERS).getLastRow() + 1);
+          extra[KEY_NEXT_ROW] = String(p.row + 1);
+        }
+        if (p.redeemedAt) result = 'ALREADY';
+        else if (p[k]) result = 'DUP';
+        else { p[k] = now; if (!p.firstBooth) p.firstBooth = pt; result = 'NEW_STAMP'; }
+      }
+      if (tel && !p.phoneKey) { p.phoneKey = phoneKey_(tel); p.phone4 = tel.slice(-4); extra[PFX_TEL + p.phoneKey] = p.code; }
+      p.lastScanAt = now;
+      recompute_(p);
+      saveP_(pr, p, extra);
+      out = ok_({ result: result, point: pt, card: cardOut_(p) });
+      if (ridKey) cache.put(ridKey, JSON.stringify(out), SCAN_REPLAY_SEC);
     }
-    p.lastScanAt = now;
-    recompute_(p);
-    writePlayer_(sh, row, p);
-    logScan_(now, p.code, pt, result, ch);
-    SpreadsheetApp.flush();
-    out = ok_({ result: result, point: pt, card: cardOut_(p) });
-    if (ridKey) cache.put(ridKey, JSON.stringify(out), SCAN_REPLAY_SEC);
   } finally { lock.releaseLock(); }
-  cache.remove(CACHE_DASH);
+  if (result) writeSheetRow_(p);
+  logScan_(now, p ? p.code : '', pt, result || out.data.result, ch);
   return out;
 }
 
@@ -155,45 +162,8 @@ function scan_(req) {
 function state_(req) {
   const tel = normTel_(req.tel);
   if (req.tel && !tel) return fail_('BAD_TEL', 'กรุณากรอกเบอร์มือถือ 10 หลัก เช่น 0812345678');
-  const found = cardFor_(sheet_(SHEETS.PLAYERS), req.code, req.key, tel);
-  return found.p ? ok_({ card: cardOut_(found.p) }) : fail_('NOT_FOUND', tel ? 'ยังไม่มีบัตรของเบอร์นี้ สแกน QR ที่บูธเพื่อเริ่มสะสมได้เลยค่ะ' : 'ไม่พบบัตรในเครื่องนี้');
-}
-
-/** รวม Stamp: ลูกค้าเผลอสแกนคนละแอป → ใส่รหัสเดิมเพื่อรวมเป็นใบเดียว */
-function merge_(req) {
-  const target = String(req.target || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (!/^[A-Z][A-Z0-9]{4}$/.test(target)) return fail_('INVALID', 'รหัสมี 5 ตัว เช่น K7Q2X');
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(20000)) return fail_('BUSY', 'ระบบกำลังทำงาน กรุณาลองอีกครั้ง');
-  let t;
-  try {
-    const sh = sheet_(SHEETS.PLAYERS);
-    let tRow = findRow_(sh, C.code, target);
-    if (!tRow) return fail_('NOT_FOUND', 'ไม่พบรหัส ' + target + ' กรุณาตรวจสอบอีกครั้ง');
-    t = readRow_(sh, tRow);
-    if (t.mergedInto) { tRow = findRow_(sh, C.code, t.mergedInto); t = readRow_(sh, tRow); }
-    const cur = findCard_(sh, req.code, req.key);
-    if (cur.p && cur.p.code !== t.code) {
-      const c = cur.p;
-      ['b1', 'b2', 'b3'].forEach(function (k) {
-        const a = toDate_(t[k]), b = toDate_(c[k]);
-        if (b && (!a || b < a)) t[k] = b;
-      });
-      const cr = toDate_(c.redeemedAt), tr = toDate_(t.redeemedAt);
-      if (cr && (!tr || cr < tr)) t.redeemedAt = cr;
-      t.exitFails = (Number(t.exitFails) || 0) + (Number(c.exitFails) || 0);
-      if (!t.firstBooth) t.firstBooth = c.firstBooth;
-      c.mergedInto = t.code;
-      recompute_(c);
-      writePlayer_(sh, cur.row, c);
-      logScan_(new Date(), c.code, 'MERGE', 'INTO ' + t.code, '');
-    }
-    recompute_(t);
-    writePlayer_(sh, tRow, t);
-    SpreadsheetApp.flush();
-  } finally { lock.releaseLock(); }
-  CacheService.getScriptCache().remove(CACHE_DASH);
-  return ok_({ card: cardOut_(t) }, 'รวม Stamp แล้ว');
+  const p = cardFor_(req.code, req.key, tel);
+  return p ? ok_({ card: cardOut_(p) }) : fail_('NOT_FOUND', tel ? 'ยังไม่มีบัตรของเบอร์นี้ สแกน QR ที่บูธเพื่อเริ่มสะสมได้เลยค่ะ' : 'ไม่พบบัตรในเครื่องนี้');
 }
 
 /* ================================================================ DASHBOARD */
@@ -212,7 +182,7 @@ function dashboard_(req) {
   const cache = CacheService.getScriptCache(), hit = cache.get(CACHE_DASH);
   if (hit) return ok_(JSON.parse(hit));
   const s = getSettings_();
-  const lite = readPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
+  const lite = allPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
     return { code: p.code, ch: p.channel, b: [ms_(p.b1), ms_(p.b2), ms_(p.b3)], red: ms_(p.redeemedAt), fails: Number(p.exitFails) || 0 };
   });
   const out = {
@@ -220,14 +190,14 @@ function dashboard_(req) {
     generatedAt: Date.now(), eventName: s.EVENT_NAME, prototype: isTrue_(s.PROTOTYPE_MODE)
   };
   const txt = JSON.stringify(out);
-  if (txt.length < 95000) cache.put(CACHE_DASH, txt, 6);
+  if (txt.length < 95000) cache.put(CACHE_DASH, txt, 8);
   return ok_(out);
 }
 
 function export_(req) {
   if (!auth_(req.token)) return fail_('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
   const s = getSettings_();
-  const rows = readPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
+  const rows = allPlayers_().filter(function (p) { return !p.mergedInto; }).map(function (p) {
     const o = {};
     COLS.forEach(function (c) {
       if (c[1] === 'phoneKey') return;   // ไม่ส่งค่าเบอร์เข้ารหัสออกไป
@@ -252,42 +222,79 @@ function simulate_(req) {
   const n = Math.max(0, Math.min(20, Number(req.n) || 0));
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return fail_('BUSY', 'ระบบกำลังทำงาน');
+  const touched = [];
   try {
-    const sh = sheet_(SHEETS.PLAYERS), now = new Date();
-    const list = readPlayersWithRow_(sh).filter(function (x) { return !x.p.mergedInto && !x.p.redeemedAt; });
+    const pr = props_(), now = new Date(), map = {};
+    const list = allPlayers_().filter(function (p) { return !p.mergedInto && !p.redeemedAt; });
     for (let k = 0; k < Math.ceil(n * 1.3) && list.length; k++) {
-      const x = list.splice(Math.floor(Math.random() * list.length), 1)[0], p = x.p;
+      const p = list.splice(Math.floor(Math.random() * list.length), 1)[0];
       const missing = ['b1', 'b2', 'b3'].filter(function (b) { return !p[b]; });
       if (missing.length) p[missing[Math.floor(Math.random() * missing.length)]] = now;
       else if (Math.random() < 0.9) p.redeemedAt = now;
-      p.lastScanAt = now; recompute_(p); writePlayer_(sh, x.row, p);
+      p.lastScanAt = now; recompute_(p); map[PFX_CARD + p.code] = packP_(p); touched.push(p);
     }
-    const rows = [];
+    let next = Number(pr.getProperty(KEY_NEXT_ROW)) || (sheet_(SHEETS.PLAYERS).getLastRow() + 1);
     for (let i = 0; i < n; i++) {
-      const p = blankPlayer_(uniqueCode_(sh), now, Math.random() < 0.85 ? 'LINE' : 'WEB');
+      const p = blankPlayer_(uniqueCode_(pr), now, Math.random() < 0.85 ? 'LINE' : 'WEB');
       const b = 1 + Math.floor(Math.random() * 3);
-      p['b' + b] = now; p.firstBooth = 'B' + b; p.lastScanAt = now; recompute_(p);
-      rows.push(toRow_(p));
+      p['b' + b] = now; p.firstBooth = 'B' + b; p.lastScanAt = now; p.row = next++; recompute_(p);
+      map[PFX_CARD + p.code] = packP_(p); touched.push(p);
     }
-    writeRows_(sh, rows);
+    map[KEY_NEXT_ROW] = String(next);
+    pr.setProperties(map);
   } finally { lock.releaseLock(); }
+  touched.forEach(writeSheetRow_);
   CacheService.getScriptCache().remove(CACHE_DASH);
   return ok_({ added: n });
 }
 
 /* ================================================================ HELPERS */
 
-function findCard_(sh, code, key) {
+/* ---------------- ที่เก็บข้อมูลบัตร (Script Properties) ----------------
+ * p.<รหัส> = ข้อมูลบัตร (JSON)   t.<เบอร์เข้ารหัส> = รหัสบัตร   n = แถวถัดไปในชีต Players */
+const PFX_CARD = 'p.', PFX_TEL = 't.', KEY_NEXT_ROW = 'n';
+function props_() { return PropertiesService.getScriptProperties(); }
+
+// เก็บแบบย่อ (~100 ไบต์/บัตร) เวลาเป็นวินาทีนับจาก 1 ม.ค. 2026 ฐาน 36  ที่เก็บรับได้ 500 KB ≈ 3,000+ บัตร
+const T0 = 1767225600000;
+function t36_(v) { const m = ms_(v); return m ? Math.round((m - T0) / 1000).toString(36) : 0; }
+function d36_(v) { return v ? new Date(T0 + parseInt(v, 36) * 1000) : ''; }
+
+function packP_(p) {
+  return JSON.stringify([p.row || 0, t36_(p.createdAt), p.firstBooth || '', t36_(p.b1), t36_(p.b2), t36_(p.b3), t36_(p.completedAt),
+    t36_(p.redeemedAt), p.channel === 'LINE' ? 'L' : 'W', Number(p.exitFails) || 0, p.mergedInto || '', t36_(p.lastScanAt), p.phoneKey || '', p.phone4 || '']);
+}
+
+function unpackP_(code, txt) {
+  const a = JSON.parse(txt);
+  const p = { code: code, row: a[0] || 0, createdAt: d36_(a[1]), firstBooth: a[2] || '', b1: d36_(a[3]), b2: d36_(a[4]), b3: d36_(a[5]),
+    stamps: 0, completedAt: d36_(a[6]), redeemedAt: d36_(a[7]), status: '', channel: a[8] === 'L' ? 'LINE' : 'WEB', exitFails: a[9] || 0,
+    mergedInto: a[10] || '', lastScanAt: d36_(a[11]), phoneKey: a[12] || '', phone4: a[13] || '' };
+  recompute_(p);
+  return p;
+}
+
+function getP_(pr, code) { if (!code) return null; const t = pr.getProperty(PFX_CARD + code); return t ? unpackP_(code, t) : null; }
+function follow_(pr, p) { if (p && p.mergedInto) { const t = getP_(pr, p.mergedInto); if (t) return t; } return p; }
+
+function saveP_(pr, p, extra) {
+  const m = extra || {};
+  m[PFX_CARD + p.code] = packP_(p);
+  pr.setProperties(m);
+}
+
+function allPlayers_() {
+  const all = props_().getProperties(), out = [];
+  Object.keys(all).forEach(function (k) { if (k.indexOf(PFX_CARD) === 0) out.push(unpackP_(k.slice(PFX_CARD.length), all[k])); });
+  return out.sort(function (a, b) { return (a.row || 0) - (b.row || 0); });
+}
+
+/** บัตรที่เครื่องจำไว้ (รหัส + กุญแจที่ระบบเซ็นให้) */
+function findCard_(code, key) {
   code = String(code || '').toUpperCase();
-  if (!code || !key || key !== cardKey_(code)) return { p: null, row: 0 };
-  let row = findRow_(sh, C.code, code);
-  if (!row) return { p: null, row: 0 };
-  let p = readRow_(sh, row);
-  if (p.mergedInto) {
-    const r2 = findRow_(sh, C.code, p.mergedInto);
-    if (r2) { row = r2; p = readRow_(sh, r2); }
-  }
-  return { p: p, row: row };
+  if (!code || !key || key !== cardKey_(code)) return null;
+  const pr = props_();
+  return follow_(pr, getP_(pr, code));
 }
 
 /** เบอร์มือถือไทย 10 หลัก (ตัดขีด/เว้นวรรค, +66 → 0) */
@@ -303,41 +310,45 @@ function phoneKey_(tel) {
     .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
 }
 
-function findByPhone_(sh, tel) {
-  let row = findRow_(sh, C.phoneKey, phoneKey_(tel));
-  if (!row) return { p: null, row: 0 };
-  let p = readRow_(sh, row);
-  if (p.mergedInto) {
-    const r2 = findRow_(sh, C.code, p.mergedInto);
-    if (r2) { row = r2; p = readRow_(sh, r2); }
-  }
-  return { p: p, row: row };
+function findByPhone_(tel) {
+  const pr = props_(), code = pr.getProperty(PFX_TEL + phoneKey_(tel));
+  return code ? follow_(pr, getP_(pr, code)) : null;
 }
 
 /** หาบัตร: ถ้ากรอกเบอร์ เบอร์คือตัวจริง (บัตรของเบอร์นั้น หรือบัตรในเครื่องที่ยังไม่ผูกเบอร์) ไม่งั้นใช้บัตรที่เครื่องจำไว้ */
-function cardFor_(sh, code, key, tel) {
-  const dev = findCard_(sh, code, key);
+function cardFor_(code, key, tel) {
+  const dev = findCard_(code, key);
   if (!tel) return dev;
-  const byTel = findByPhone_(sh, tel);
-  if (byTel.p) return byTel;
-  if (dev.p && !dev.p.phoneKey) return dev;
-  return { p: null, row: 0 };
+  const byTel = findByPhone_(tel);
+  if (byTel) return byTel;
+  return dev && !dev.phoneKey ? dev : null;
 }
 
-function newPlayer_(sh, now, ch) { return blankPlayer_(uniqueCode_(sh), now, ch); }
+function uniqueCode_(pr, used) {
+  let code;
+  do {
+    code = CODE_FIRST.charAt(Math.floor(Math.random() * CODE_FIRST.length));
+    for (let i = 0; i < 4; i++) code += CODE_REST.charAt(Math.floor(Math.random() * CODE_REST.length));
+  } while ((used && used[code]) || (pr && pr.getProperty(PFX_CARD + code)));
+  if (used) used[code] = 1;
+  return code;
+}
+
+/** เขียนแถวของบัตรลงชีต Players (สำเนาของข้อมูลจริง) — ทำนอก Lock */
+function writeSheetRow_(p) {
+  if (!p || !p.row) return;
+  try {
+    p = getP_(props_(), p.code) || p;
+    const sh = sheet_(SHEETS.PLAYERS), max = sh.getMaxRows();
+    if (p.row > max) { const add = Math.max(p.row - max, 500); sh.insertRowsAfter(max, add); formatPlayerColumns_(sh, max + 1, add); }
+    sh.getRange(p.row, 1, 1, COLS.length).setValues([toRow_(p)]);
+  } catch (err) { console.warn('sheet row write failed', p.code, err); }
+}
 
 function blankPlayer_(code, now, ch) {
   return { code: code, createdAt: now, firstBooth: '', b1: '', b2: '', b3: '', stamps: 0, completedAt: '', redeemedAt: '', status: '', channel: ch, exitFails: 0, mergedInto: '', lastScanAt: now, phoneKey: '', phone4: '' };
 }
 
-function uniqueCode_(sh) {
-  let code;
-  do {
-    code = CODE_FIRST.charAt(Math.floor(Math.random() * CODE_FIRST.length));
-    for (let i = 0; i < 4; i++) code += CODE_REST.charAt(Math.floor(Math.random() * CODE_REST.length));
-  } while (findRow_(sh, C.code, code));
-  return code;
-}
 
 function countStamps_(p) { return ['b1', 'b2', 'b3'].filter(function (k) { return !!toDate_(p[k]); }).length; }
 
@@ -357,8 +368,6 @@ function cardOut_(p) {
   };
 }
 
-function readPlayers_() { return readPlayersWithRow_(sheet_(SHEETS.PLAYERS)).map(function (x) { return x.p; }); }
-
 function readPlayersWithRow_(sh) {
   const last = sh.getLastRow();
   if (last < 2) return [];
@@ -366,8 +375,6 @@ function readPlayersWithRow_(sh) {
     .map(function (r, i) { return { row: i + 2, p: rowObj_(r) }; })
     .filter(function (x) { return x.p.code; });
 }
-
-function readRow_(sh, row) { return rowObj_(sh.getRange(row, 1, 1, COLS.length).getValues()[0]); }
 
 function rowObj_(r) {
   const o = {};
@@ -390,35 +397,12 @@ function toRow_(p) {
   });
 }
 
-function writePlayer_(sh, row, p) {
-  if (row) sh.getRange(row, 1, 1, COLS.length).setValues([toRow_(p)]);
-  else writeRows_(sh, [toRow_(p)]);
-}
-
-function writeRows_(sh, rows) {
-  if (!rows.length) return;
-  const start = sh.getLastRow() + 1, max = sh.getMaxRows(), need = start + rows.length - 1 - max;
-  if (need > 0) {
-    const add = Math.max(need, 500);
-    sh.insertRowsAfter(max, add);
-    formatPlayerColumns_(sh, max + 1, add);
-  }
-  sh.getRange(start, 1, rows.length, COLS.length).setValues(rows);
-}
-
 function logScan_(when, code, point, result, ch) {
   try {
     let sh = ss_().getSheetByName(SHEETS.SCANS);
     if (!sh) { sh = ss_().insertSheet(SHEETS.SCANS); sh.appendRow(['Time', 'Code', 'Point', 'Result', 'Channel']); }
     sh.appendRow([when, code ? "'" + code : '', point, result, ch]);
   } catch (err) { console.warn('log failed', err); }
-}
-
-function findRow_(sh, col, value) {
-  const last = sh.getLastRow();
-  if (last < 2 || !value) return 0;
-  const cell = sh.getRange(2, col, last - 1, 1).createTextFinder(String(value)).matchEntireCell(true).matchCase(false).findNext();
-  return cell ? cell.getRow() : 0;
 }
 
 function sheet_(name) {
@@ -430,7 +414,10 @@ function sheet_(name) {
 let SS_ = null;
 function ss_() {
   if (SS_) return SS_;
-  const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  const cache = CacheService.getScriptCache();
+  let id = cache.get('stamp_ssid');
+  if (!id) { id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID') || '-'; cache.put('stamp_ssid', id, 21600); }
+  if (id === '-') id = '';
   SS_ = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
   if (!SS_) throw new Error('ไม่พบ Google Sheet — สร้างสคริปต์จากเมนู Extensions > Apps Script ของชีต');
   return SS_;
@@ -471,11 +458,18 @@ function parsePoint_(s) {
 function pointSig_(id) { return sign_('pt|' + id).slice(0, 8); }
 function cardKey_(code) { return sign_('card|' + String(code).toUpperCase()).slice(0, 12); }
 
+let SECRET_ = null;
 function secret_() {
-  const props = PropertiesService.getScriptProperties();
-  let s = props.getProperty('TOKEN_SECRET');
-  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('TOKEN_SECRET', s); }
-  return s;
+  if (SECRET_) return SECRET_;
+  const cache = CacheService.getScriptCache();
+  let s = cache.get('stamp_secret');
+  if (!s) {
+    const props = PropertiesService.getScriptProperties();
+    s = props.getProperty('TOKEN_SECRET');
+    if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); props.setProperty('TOKEN_SECRET', s); }
+    cache.put('stamp_secret', s, 21600);
+  }
+  return (SECRET_ = s);
 }
 function sign_(text) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(text, secret_())).replace(/[=_-]/g, ''); }
 function signToken_(exp, s) { return sign_('tok|' + exp + '|' + s.PIN).slice(0, 16); }
@@ -600,6 +594,7 @@ function setup() {
   sh.setFrozenRows(1);
   if (sh.getMaxRows() < MIN_PLAYER_ROWS + 1) sh.insertRowsAfter(sh.getMaxRows(), MIN_PLAYER_ROWS + 1 - sh.getMaxRows());
   formatPlayerColumns_(sh, 2, sh.getMaxRows() - 1);
+  const imported = importSheetToStore_(sh);
 
   // Scans log
   if (!ss.getSheetByName(SHEETS.SCANS)) {
@@ -657,6 +652,7 @@ function setup() {
   secret_();
   [CACHE_SETTINGS, CACHE_DASH].forEach(function (k) { CacheService.getScriptCache().remove(k); });
   Logger.log('✅ Setup เสร็จ  PIN สำหรับ Dashboard = ' + getSettings_().PIN + '  (แก้ได้ในชีต Settings)');
+  Logger.log('ที่เก็บข้อมูลบัตร: ' + allPlayers_().length + ' บัตร' + (imported ? ' (ย้ายจากชีต Players ' + imported + ' บัตร)' : ''));
   Logger.log('ต่อไป: Deploy > New deployment > Web app (Execute as: Me | Who has access: Anyone)');
   Logger.log('หน้าเว็บที่โฮสต์บน GitHub Pages: ใส่ลิงก์ในชีต Settings ช่อง APP_URL');
 }
@@ -672,17 +668,17 @@ function formatPlayerColumns_(sh, from, n) {
 function seedDemoData() {
   guardOwner_();
   if (!isTrue_(getSettings_().PROTOTYPE_MODE)) throw new Error('ชีตนี้ตั้งเป็นโหมดใช้งานจริง (PROTOTYPE_MODE = FALSE) จึงไม่ใส่ข้อมูลตัวอย่าง ถ้าจะโชว์ลูกค้า ให้ตั้งเป็น TRUE ก่อน');
-  const sh = sheet_(SHEETS.PLAYERS), now = Date.now(), start = now - 95 * 60000, rows = [], used = {};
+  const sh = sheet_(SHEETS.PLAYERS), now = Date.now(), start = now - 95 * 60000, rows = [], used = {}, map = {};
   const rnd = function (a, b) { return a + Math.random() * (b - a); };
   const lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
+    const pr = props_();
+    allPlayers_().forEach(function (p) { used[p.code] = 1; });
+    const first = Number(pr.getProperty(KEY_NEXT_ROW)) || (sh.getLastRow() + 1);
     for (let i = 0; i < 450; i++) {
       const arrive = start + Math.pow(Math.random(), 0.85) * (now - start);
       const order = [1, 2, 3].sort(function () { return Math.random() - 0.5; });
-      let code = uniqueCode_(sh);
-      while (used[code]) code = uniqueCode_(sh);
-      used[code] = 1;
-      const p = blankPlayer_(code, new Date(arrive), Math.random() < 0.85 ? 'LINE' : 'WEB');
+      const p = blankPlayer_(uniqueCode_(null, used), new Date(arrive), Math.random() < 0.85 ? 'LINE' : 'WEB');
       let t = arrive;
       for (let k = 0; k < 3; k++) {
         if (k === 1 && Math.random() > 0.86) break;
@@ -694,10 +690,16 @@ function seedDemoData() {
       }
       if (countStamps_(p) === 3 && Math.random() < 0.92) { const r = t + rnd(3, 18) * 60000; if (r <= now) p.redeemedAt = new Date(r); }
       p.lastScanAt = new Date(Math.min(now, t));
+      p.row = first + i;
       recompute_(p);
       rows.push(toRow_(p));
+      map[PFX_CARD + p.code] = packP_(p);
     }
-    writeRows_(sh, rows);
+    map[KEY_NEXT_ROW] = String(first + rows.length);
+    pr.setProperties(map);
+    const max = sh.getMaxRows(), need = first + rows.length - 1 - max;
+    if (need > 0) { sh.insertRowsAfter(max, need + 500); formatPlayerColumns_(sh, max + 1, need + 500); }
+    sh.getRange(first, 1, rows.length, COLS.length).setValues(rows);
   } finally { lock.releaseLock(); }
   CacheService.getScriptCache().remove(CACHE_DASH);
   Logger.log('ใส่ผู้เล่นตัวอย่าง 450 คนแล้ว');
@@ -706,13 +708,49 @@ function seedDemoData() {
 /** ล้างข้อมูลผู้เล่นทั้งหมด (ใช้ก่อนวันงานจริง) — ไม่ลบ Settings */
 function clearAllData() {
   guardOwner_();
-  // ล้างแค่เนื้อหา คงแถวและรูปแบบคอลัมน์ไว้
-  [[SHEETS.PLAYERS, COLS.length], [SHEETS.SCANS, 5]].forEach(function (x) {
-    const sh = ss_().getSheetByName(x[0]);
-    if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, x[1]).clearContent();
-  });
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    // ล้างบัตรใน Script Properties (คง TOKEN_SECRET ไว้ QR ที่พิมพ์แล้วยังใช้ได้)
+    const pr = props_(), all = pr.getProperties(), keep = {};
+    Object.keys(all).forEach(function (k) { if (k.indexOf(PFX_CARD) !== 0 && k.indexOf(PFX_TEL) !== 0 && k !== KEY_NEXT_ROW) keep[k] = all[k]; });
+    keep[KEY_NEXT_ROW] = '2';
+    pr.setProperties(keep, true);
+    // ล้างแค่เนื้อหา คงแถวและรูปแบบคอลัมน์ไว้
+    [[SHEETS.PLAYERS, COLS.length], [SHEETS.SCANS, 5]].forEach(function (x) {
+      const sh = ss_().getSheetByName(x[0]);
+      if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, x[1]).clearContent();
+    });
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
   CacheService.getScriptCache().remove(CACHE_DASH);
   Logger.log('ล้างข้อมูลผู้เล่นแล้ว');
+}
+
+/** ย้ายข้อมูลจากชีต Players เข้าที่เก็บ (ครั้งแรกหลังอัปเดตระบบ) */
+function importSheetToStore_(sh) {
+  const pr = props_(), all = pr.getProperties();
+  if (Object.keys(all).some(function (k) { return k.indexOf(PFX_CARD) === 0; })) {
+    if (!all[KEY_NEXT_ROW]) pr.setProperty(KEY_NEXT_ROW, String(Math.max(2, sh.getLastRow() + 1)));
+    return 0;
+  }
+  const map = {}, list = readPlayersWithRow_(sh);
+  list.forEach(function (x) {
+    x.p.row = x.row;
+    map[PFX_CARD + x.p.code] = packP_(x.p);
+    if (x.p.phoneKey && !x.p.mergedInto) map[PFX_TEL + x.p.phoneKey] = x.p.code;
+  });
+  map[KEY_NEXT_ROW] = String(Math.max(2, sh.getLastRow() + 1));
+  pr.setProperties(map);
+  return list.length;
+}
+
+/** เขียนชีต Players ใหม่ทั้งหมดจากข้อมูลจริง (ใช้ถ้าตัวเลขในชีตไม่ตรงกับ Dashboard) */
+function syncSheetFromStore() {
+  guardOwner_();
+  const sh = sheet_(SHEETS.PLAYERS), list = allPlayers_();
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, COLS.length).clearContent();
+  list.forEach(function (p) { if (p.row) sh.getRange(p.row, 1, 1, COLS.length).setValues([toRow_(p)]); });
+  Logger.log('เขียนชีต Players ใหม่จากข้อมูลจริงแล้ว ' + list.length + ' บัตร');
 }
 
 function onEdit(e) {

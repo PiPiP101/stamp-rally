@@ -280,7 +280,8 @@ const TEXT = {
   exitIncomplete: ['ขอบคุณที่แวะมาร่วมสนุกนะคะ', 'ตอนนี้คุณมี Stamp {n} จาก 3 ดวง ยังขาดอีก{missing} สะสมให้ครบแล้วกลับมารับของที่ระลึกได้เลยค่ะ'],
   already: ['รหัสนี้รับของที่ระลึกไปแล้วค่ะ', 'รับเมื่อเวลา {time} น. ขอบคุณที่มาร่วมสนุกกับเราค่ะ'],
   noCard: ['ยังไม่พบ Stamp ของเบอร์ลงท้าย {tel4} ค่ะ', 'ตรวจสอบว่าเป็นเบอร์เดียวกับที่ใช้ตอนสะสม Stamp หรือเริ่มสะสมได้ที่บูธที่ 1, 2 และ 3 แล้วกลับมารับของที่ระลึกนะคะ'],
-  badQr: ['QR นี้ใช้ไม่ได้ค่ะ', 'กรุณาสแกนจากป้ายในงาน']
+  badQr: ['QR นี้ใช้ไม่ได้ค่ะ', 'กรุณาสแกนจากป้ายในงาน'],
+  busy: 'มีคนสแกนพร้อมกันเยอะ กำลังบันทึกให้ รอสักครู่นะคะ…'
 };
 
 /* =====================================================================
@@ -610,7 +611,7 @@ const Backend = (() => {
       catch (e) {
         last = e;
         if (mode === 'gas' && restUrl()) useRest = !useRest;   // สลับไปลองอีกช่องทาง
-        await sleep(600 * (i + 1));
+        await sleep(600 * (i + 1) + Math.random() * 900);
       }
     }
     throw last;
@@ -697,7 +698,15 @@ class Cust {
     this.top(); this.loading('กำลังบันทึก…');
     const me = this.card || {};
     try {
-      const r = await Backend.call('scan', { s, code: me.code, key: me.key, tel: tel || undefined, ch: this.channel, rid });
+      let r;
+      // คนสแกนพร้อมกันเยอะ → รอสักครู่แล้วส่งใหม่ให้เอง (rid เดิม ระบบไม่นับซ้ำ)
+      for (let i = 0, fails = 0; ; i++) {
+        try { r = await Backend.call('scan', { s, code: me.code, key: me.key, tel: tel || undefined, ch: this.channel, rid }); }
+        catch (e) { if (++fails > 2 || navigator.onLine === false) throw e; r = { success: false, code: 'BUSY' }; }   // ระบบ Google รับไม่ทัน (เกิน 30 คำขอพร้อมกัน) → ลองใหม่
+        if (r.success || !/^(BUSY|SERVER_ERROR)$/.test(r.code) || i >= 5) break;
+        this.loading(TEXT.busy);
+        await sleep(1200 + Math.random() * 2300);
+      }
       if (!r.success && r.code === 'BAD_TEL') return this.render({ kind: 'tel', s, error: r.message });
       if (!r.success) return this.render({ kind: r.code === 'BAD_QR' ? 'bad' : 'error', message: r.message, retry: r.code === 'BAD_QR' ? null : () => this.scan(s, rid, tel) });
       // เครื่องจำบัตรไม่ได้ → ขอเบอร์มือถือ (บัตรผูกกับเบอร์ ล้างเบราว์เซอร์ก็กลับมาได้)
