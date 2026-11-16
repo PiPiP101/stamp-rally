@@ -435,6 +435,14 @@ select.input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .c-lang button{min-width:46px;height:32px;padding:0 12px;border-radius:999px;font-size:13.5px;font-weight:600;color:#fff;letter-spacing:.02em;transition:background .15s,color .15s}
 .c-lang button.on{background:#fff;color:var(--secondary)}
 .c-lang button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.lang-sw{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.1)}
+.lang-sw button{min-width:42px;height:30px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:600;color:rgba(255,255,255,.85);transition:background .15s,color .15s}
+.lang-sw button.on{background:#fff;color:var(--secondary)}
+.lang-sw button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.lang-sw.light{position:absolute;top:14px;right:14px;background:var(--bg)}
+.lang-sw.light button{color:var(--ink-2)}
+.lang-sw.light button.on{background:var(--secondary);color:#fff}
+.lang-sw.light+img{margin-top:34px}
 
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
@@ -1076,6 +1084,94 @@ class Cust {
   }
 }
 
+/* ---------- ภาษา ไทย / English (Dashboard + หน้าทีมงาน) ---------- */
+const DI18N = {
+  th: {
+    pinEnter: 'ใส่ PIN 6 หลัก', del: 'ลบ', checking: 'กำลังตรวจสอบ…', badPin: 'PIN ไม่ถูกต้อง', pinRole: 'PIN นี้ใช้กับหน้านี้ไม่ได้',
+    pinDemo: (c, a) => 'โหมดตัวอย่าง: PIN แบรนด์ ' + c + ' · ทีมงาน ' + a, protoGate: 'Prototype สำหรับนำเสนอ',
+    ppl: 'คน', hr: ' น.', sessionOut: 'หมดเวลาเข้าสู่ระบบ กรุณาใส่ PIN ใหม่',
+    destroyed: (at, n) => '<b>ข้อมูลส่วนบุคคลถูกทำลายแล้ว</b> เมื่อ ' + at + ' น. จำนวน ' + n + ' รายการ',
+    kTotal: 'ผู้ลงทะเบียนรวมทุกวัน', kTotalSub: n => 'รวม ' + n + ' วันกิจกรรม', kToday: 'ลงทะเบียนวันนี้', kPeak: t => 'ช่วงพีค ' + t + ' น.',
+    kMk: 'ยินยอมรับข่าวสาร', kMkSub: n => n + ' คน นำไปทำ Remarketing ได้', kPace: 'ลงทะเบียน 15 นาทีล่าสุด', kAuto: 'อัปเดตอัตโนมัติ',
+    kDup: 'สิทธิ์ต่อท่าน', kDupVal: '1 <small>ครั้ง</small>', kDupSub: 'เลขบัตรหรือเบอร์ซ้ำ ระบบไม่รับ ตลอด 4 วัน',
+    pvTitle: 'ความปลอดภัยข้อมูล', pvSub: 'Dashboard นี้แสดงเฉพาะตัวเลขรวม', pvBig: 'รายชื่อที่เก็บแบบเข้ารหัส',
+    pvList: ['ไม่แสดงชื่อ เลขบัตร เบอร์ หรืออีเมลของใครบนหน้านี้', 'ทุกหน้าของทีมงานต้องใส่ PIN', 'จบกิจกรรม ส่งมอบให้ AXTRA Club แบบเข้ารหัส แล้วทำลายทั้งหมด'],
+    cycle: [['ระหว่างงาน', 'เก็บแบบเข้ารหัส'], ['ส่งมอบ', 'ไฟล์ล็อกรหัส'], ['ยืนยันรับ', 'ใบส่งมอบ'], ['ทำลาย', 'มีหนังสือรับรอง']],
+    cumTitle: 'ผู้ลงทะเบียนวันนี้ สะสม', every15: 'แสดงทุก 15 นาที', cumAria: 'กราฟผู้ลงทะเบียนสะสมวันนี้',
+    flowTitle: 'ลงทะเบียนต่อ 15 นาที (วันนี้)', flowAria: 'กราฟผู้ลงทะเบียนต่อ 15 นาที', staff: 'ใช้วางกำลังคนที่จุดลงทะเบียน',
+    peakLine: (t, n) => 'ช่วงพีค ' + t + ' น. ลงทะเบียน ' + n + ' คน ใช้วางกำลังคนที่จุดลงทะเบียน', series: 'ลงทะเบียน',
+    daysTitle: 'ยอดลงทะเบียนรายวัน', daysSub: n => 'ทั้ง ' + n + ' วันกิจกรรม', noData: 'ยังไม่มีข้อมูล',
+    peakTitle: 'ช่วงพีควันนี้', peakIn: n => 'ลงทะเบียน ' + n + ' คนใน 15 นาที', noToday: 'ยังไม่มีข้อมูลวันนี้',
+    mkTitle: 'ยินยอมรับข่าวสาร', mkSub: 'รายชื่อที่ติดต่อชวนสมัครสมาชิกต่อได้', mkOf: (a, b) => a + ' จาก ' + b + ' คน',
+    noteTitle: 'ข้อมูลที่เก็บ', noteSub: 'เท่าที่จำเป็นต่อการติดต่อกลับ', noteList: ['ชื่อ-นามสกุล', 'เลขบัตรประชาชน หรือเลข Passport', 'เบอร์มือถือ', 'อีเมล (ไม่บังคับ)', 'ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา'],
+    feedTitle: 'ความเคลื่อนไหวล่าสุด', feedSub: 'ไม่แสดงชื่อหรือเบอร์ของลูกค้า', feedNew: 'ลงทะเบียนใหม่', feedEmpty: 'ยังไม่มีรายการ',
+    loading: 'กำลังโหลด…', live: t => 'Live  อัปเดต ' + t, liveShort: t => 'Live  ' + t + ' น.', offline: 'เชื่อมต่อไม่ได้ กำลังลองใหม่',
+    tabKit: 'QR ลงทะเบียน', tabData: 'ส่งมอบ & ทำลายข้อมูล', simOn: 'จำลองคนลงทะเบียน', simOff: 'หยุดจำลอง', logout: 'ออกจากระบบ',
+    simClock: (d, m, hm) => 'เวลาจำลอง ' + d + ' ' + MON.th[m - 1] + ' ' + hm + ' น.', simClockShort: hm => 'เวลาในงานจำลอง ' + hm + ' น.',
+    simToast: 'กำลังจำลองคนลงทะเบียน เวลาเดินเร็วขึ้น 30 เท่า', reset: 'เริ่มข้อมูลใหม่', resetToast: 'รีเซ็ตข้อมูลตัวอย่างแล้ว',
+    protoTitle: 'Prototype ระบบลงทะเบียน', openDash: 'เปิด Dashboard เต็มจอ', phoneH: '1. มือถือลูกค้า', phoneSub: 'สแกน QR จุดลงทะเบียน กรอกข้อมูล แสดงหน้าจอกับเจ้าหน้าที่',
+    newCust: 'ลูกค้าคนใหม่', newCustToast: 'เริ่มเป็นลูกค้าคนใหม่แล้ว', stepsH: 'ขั้นตอนหน้างาน',
+    steps: ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) ชาวต่างชาติกดปุ่ม EN มุมขวาบนได้', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ถ้าใช้เลขบัตรเดิมกับเบอร์ใหม่ ระบบไม่รับ ไม่แจกซ้ำ'],
+    dashH: '2. Live Dashboard ที่แบรนด์เห็น', dashSub: 'ตัวเลขรวมเท่านั้น ไม่มีข้อมูลส่วนบุคคล',
+    secH: 'ความปลอดภัยข้อมูล 5 ชั้น', secSub: 'ออกแบบให้ข้อมูลลูกค้าปลอดภัยตั้งแต่กรอกจนทำลาย',
+    sec: [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) และความยินยอม 2 ข้อ ไม่เก็บข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
+      ['เข้ารหัสก่อนบันทึก', 'ข้อมูลส่วนตัวถูกล็อกก่อนเข้าฐานข้อมูล ใครเปิดฐานข้อมูลก็อ่านไม่ออก ระบบใช้บัญชีแยกเฉพาะงานนี้'],
+      ['ให้เห็นเท่าที่จำเป็น', 'Dashboard มีแต่ตัวเลขรวม เลขบัตรไม่แสดงบนหน้าจอใดเลย หน้าจอลูกค้าแสดงเบอร์แค่ 4 ตัวท้าย ทุกหน้าของทีมงานต้องใส่ PIN'],
+      ['ส่งมอบแบบเข้ารหัส', 'ไฟล์ล็อกด้วยรหัสผ่าน AES-256 ส่งไฟล์กับรหัสคนละช่องทาง มีใบส่งมอบพร้อมรหัสตรวจสอบไฟล์'],
+      ['ทำลายหลังส่งมอบ', 'ลบฐานข้อมูล ระบบ หน้าเว็บ และสำเนาทั้งหมด พร้อมหนังสือรับรองการทำลายข้อมูล']],
+    kitH: 'QR ลงทะเบียน', kitSub: 'ใช้ QR เดียวกันทุกจุด พิมพ์ได้หลายป้าย ตั้งที่จุดไหนก็ได้', kitCard: 'QR ลงทะเบียน', kitAny: 'ใช้ได้ทุกจุด',
+    kitDl: 'ดาวน์โหลดโปสเตอร์', kitCopy: 'คัดลอกลิงก์', making: 'กำลังสร้าง…', copied: 'คัดลอกลิงก์แล้ว', copyPrompt: 'คัดลอกลิงก์นี้',
+    demoBar: 'โหมดตัวอย่าง: ข้อมูลจำลอง · ', toReg: 'ไปหน้าลงทะเบียน', toDash: 'ดู Dashboard แบบเรียลไทม์'
+  },
+  en: {
+    pinEnter: 'Enter your 6-digit PIN', del: 'Delete', checking: 'Checking…', badPin: 'Incorrect PIN', pinRole: 'This PIN cannot open this page',
+    pinDemo: (c, a) => 'Demo mode: brand PIN ' + c + ' · staff PIN ' + a, protoGate: 'Presentation prototype',
+    ppl: 'people', hr: '', sessionOut: 'Session expired. Please enter your PIN again.',
+    destroyed: (at, n) => '<b>Personal data has been deleted</b> on ' + at + ', ' + n + ' records',
+    kTotal: 'Total registrations', kTotalSub: n => 'Across ' + n + ' event days', kToday: 'Registered today', kPeak: t => 'Peak at ' + t,
+    kMk: 'Marketing consent', kMkSub: n => n + ' people available for remarketing', kPace: 'Last 15 minutes', kAuto: 'Updates automatically',
+    kDup: 'Per person', kDupVal: '1 <small>entry</small>', kDupSub: 'Duplicate ID or phone rejected across all 4 days',
+    pvTitle: 'Data security', pvSub: 'This dashboard shows totals only', pvBig: 'records stored encrypted',
+    pvList: ['No names, ID numbers, phone numbers or emails are shown here', 'Every staff page requires a PIN', 'After the event: encrypted handover to AXTRA Club, then full deletion'],
+    cycle: [['During event', 'Encrypted storage'], ['Handover', 'Locked file'], ['Receipt', 'Signed form'], ['Deletion', 'Certificate']],
+    cumTitle: 'Registrations today, cumulative', every15: 'Every 15 minutes', cumAria: 'Chart of cumulative registrations today',
+    flowTitle: 'Registrations per 15 minutes (today)', flowAria: 'Chart of registrations per 15 minutes', staff: 'Use it to plan counter staffing',
+    peakLine: (t, n) => 'Peak at ' + t + ' with ' + n + ' registrations. Use it to plan counter staffing', series: 'Registrations',
+    daysTitle: 'Daily registrations', daysSub: n => 'All ' + n + ' event days', noData: 'No data yet',
+    peakTitle: "Today's peak", peakIn: n => n + ' registrations in 15 minutes', noToday: 'No data today yet',
+    mkTitle: 'Marketing consent', mkSub: 'Contacts available for membership follow-up', mkOf: (a, b) => a + ' of ' + b + ' people',
+    noteTitle: 'Data collected', noteSub: 'Only what is needed to follow up', noteList: ['First and last name', 'Thai ID or passport number', 'Mobile number', 'Email (optional)', 'PDPA and marketing consent, with timestamp'],
+    feedTitle: 'Latest activity', feedSub: 'No customer names or numbers shown', feedNew: 'New registration', feedEmpty: 'No activity yet',
+    loading: 'Loading…', live: t => 'Live  updated ' + t, liveShort: t => 'Live  ' + t, offline: 'Connection lost, retrying',
+    tabKit: 'Registration QR', tabData: 'Handover & deletion', simOn: 'Simulate registrations', simOff: 'Stop simulation', logout: 'Log out',
+    simClock: (d, m, hm) => 'Simulated time ' + d + ' ' + MON.en[m - 1] + ' ' + hm, simClockShort: hm => 'Simulated event time ' + hm,
+    simToast: 'Simulating registrations, clock running 30× faster', reset: 'Reset data', resetToast: 'Sample data reset',
+    protoTitle: 'Registration System Prototype', openDash: 'Open full-screen dashboard', phoneH: '1. Customer phone', phoneSub: 'Scan the QR at the registration point, fill in the form, show the screen to staff',
+    newCust: 'New customer', newCustToast: 'Started as a new customer', stepsH: 'On-site steps',
+    steps: ['Staff first invite guests to register in the Axtra Club app. If it works, done.', 'If app registration fails, staff show the QR. The guest enters name, Thai ID/passport, mobile and email (optional). Foreign guests can tap EN at the top right.', 'The screen shows <b>Registration complete</b> with a code and a live clock.', 'Counter staff hand out a <b>paper coupon</b> (the code can be written on it).', 'Registering again with the same phone shows <b>Already registered</b> with the original time. The same ID with a new phone is rejected. No second coupon.'],
+    dashH: '2. Live dashboard for the brand', dashSub: 'Totals only, no personal data',
+    secH: '5 layers of data security', secSub: 'Customer data is protected from entry to deletion',
+    sec: [['Collect only what is needed', 'Name, Thai ID/passport, mobile, email (optional) and 2 consents. Nothing else. Consent time is recorded as evidence.'],
+      ['Encrypt before storage', 'Personal data is locked before it reaches the database, so it is unreadable to anyone who opens it. The system uses a dedicated account for this event.'],
+      ['Show only what is needed', 'The dashboard shows totals only. ID numbers never appear on any screen. The customer screen shows only the last 4 phone digits. Every staff page requires a PIN.'],
+      ['Encrypted handover', 'AES-256 password-locked file. File and password are sent through separate channels, with a handover form and file checksum.'],
+      ['Delete after handover', 'Database, system, web pages and all copies are deleted, with a data deletion certificate.']],
+    kitH: 'Registration QR', kitSub: 'One QR for every point. Print as many signs as needed and place them anywhere.', kitCard: 'Registration QR', kitAny: 'Works at every point',
+    kitDl: 'Download poster', kitCopy: 'Copy link', making: 'Creating…', copied: 'Link copied', copyPrompt: 'Copy this link',
+    demoBar: 'Demo mode: sample data · ', toReg: 'Go to registration page', toDash: 'View the live dashboard'
+  }
+};
+const dt = k => { const L = DI18N[Lang.get()] || DI18N.th; return L[k] != null ? L[k] : DI18N.th[k]; };
+const langSwitch = cls => '<div class="lang-sw' + (cls ? ' ' + cls : '') + '" role="group" aria-label="Language / ภาษา">' + [['th', 'ไทย'], ['en', 'EN']].map(x => '<button type="button" data-setlang="' + x[0] + '" aria-pressed="' + (Lang.get() === x[0]) + '"' + (Lang.get() === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>').join('') + '</div>';
+function bindLangSwitch(root, tweak) {
+  $$('[data-setlang]', root).forEach(b => b.onclick = () => {
+    if (b.dataset.setlang === Lang.get()) return;
+    Lang.set(b.dataset.setlang);
+    const u = new URL(location.href); u.searchParams.delete('lang'); if (tweak) tweak(u);
+    location.href = u.toString();
+  });
+}
+
 /* =====================================================================
    PIN GATE
    ===================================================================== */
@@ -1088,23 +1184,24 @@ const Gate = {
       try { const r = await Backend.call('session', { token: sess.token }); if (r.success) return sess; } catch (e) { /* login ใหม่ */ }
     }
     return new Promise(resolve => {
-      root.innerHTML = '<div class="gate"><div class="gate-card"><img class="mx-auto" src="' + CONFIG.LOGO + '" alt="AXTRA Club" style="width:190px;height:auto"><h1 class="mt-5 text-xl font-semibold">' + esc(title) + '</h1><p class="mt-1 text-sm muted">ใส่ PIN 6 หลัก</p>' +
+      root.innerHTML = '<div class="gate"><div class="gate-card" style="position:relative">' + langSwitch('light') + '<img class="mx-auto" src="' + CONFIG.LOGO + '" alt="AXTRA Club" style="width:190px;height:auto"><h1 class="mt-5 text-xl font-semibold">' + esc(title) + '</h1><p class="mt-1 text-sm muted">' + dt('pinEnter') + '</p>' +
         '<div class="pin-dots" aria-hidden="true">' + '<i></i>'.repeat(6) + '</div><input class="sr" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="PIN" data-pin><p class="text-sm h-5" data-msg style="color:var(--danger)"></p>' +
-        '<div class="keypad">' + ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? '<span></span>' : '<button type="button" class="key" data-k="' + k + '"' + (k === 'del' ? ' aria-label="ลบ"' : '') + '>' + (k === 'del' ? '<span class="grid place-items-center">' + ICON.backspace + '</span>' : k) + '</button>').join('') + '</div>' +
-        (Backend.mode === 'demo' ? '<p class="mt-4 text-xs muted">โหมดตัวอย่าง: PIN แบรนด์ ' + Demo.PINS.client + ' · ทีมงาน ' + Demo.PINS.admin + '</p>' : '') + '</div></div>';
+        '<div class="keypad">' + ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k === '' ? '<span></span>' : '<button type="button" class="key" data-k="' + k + '"' + (k === 'del' ? ' aria-label="' + dt('del') + '"' : '') + '>' + (k === 'del' ? '<span class="grid place-items-center">' + ICON.backspace + '</span>' : k) + '</button>').join('') + '</div>' +
+        (Backend.mode === 'demo' ? '<p class="mt-4 text-xs muted">' + dt('pinDemo')(Demo.PINS.client, Demo.PINS.admin) + '</p>' : '') + '</div></div>';
+      bindLangSwitch(root);
       const inp = $('[data-pin]', root), dots = $$('.pin-dots i', root), msg = $('[data-msg]', root);
       const update = async () => {
         dots.forEach((d, i) => d.classList.toggle('on', i < inp.value.length));
         if (inp.value.length < 6) return;
-        msg.style.color = 'var(--muted)'; msg.textContent = 'กำลังตรวจสอบ…';
+        msg.style.color = 'var(--muted)'; msg.textContent = dt('checking');
         try {
           const r = await Backend.call('login', { pin: inp.value });
-          if (!r.success) throw new Error(r.message);
-          if (!allowed(r.data)) throw new Error('PIN นี้ใช้กับหน้านี้ไม่ได้');
+          if (!r.success) throw new Error(dt('badPin'));
+          if (!allowed(r.data)) throw new Error(dt('pinRole'));
           store.set(SESSION_KEY, r.data); resolve(r.data);
         } catch (e) {
           inp.value = ''; dots.forEach(d => d.classList.remove('on'));
-          msg.style.color = 'var(--danger)'; msg.textContent = e.message || 'PIN ไม่ถูกต้อง';
+          msg.style.color = 'var(--danger)'; msg.textContent = e.message || dt('badPin');
           const box = $('.pin-dots', root); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
         }
       };
@@ -1124,16 +1221,16 @@ class Dash {
     this.root = root; this.session = session; this.embedded = embedded; this.charts = {}; this.prev = {}; this.seen = new Set();
     root.innerHTML = '<div class="dash"><div data-banner></div>' +
       '<div class="kpis" data-kpis></div>' +
-      '<div class="d-grid d-a"><div class="panel"><div class="panel-title">ผู้ลงทะเบียนวันนี้ สะสม</div><p class="panel-sub">แสดงทุก 15 นาที</p><div class="relative mt-3" style="height:250px"><canvas data-ch="cum" role="img" aria-label="กราฟผู้ลงทะเบียนสะสมวันนี้"></canvas></div></div>' +
+      '<div class="d-grid d-a"><div class="panel"><div class="panel-title">' + dt('cumTitle') + '</div><p class="panel-sub">' + dt('every15') + '</p><div class="relative mt-3" style="height:250px"><canvas data-ch="cum" role="img" aria-label="' + dt('cumAria') + '"></canvas></div></div>' +
       '<div class="panel privacy-panel" data-privacy></div></div>' +
-      '<div class="d-grid d-b"><div class="panel"><div class="panel-title">ลงทะเบียนต่อ 15 นาที (วันนี้)</div><p class="panel-sub" data-peak>ใช้วางกำลังคนที่จุดลงทะเบียน</p><div class="relative mt-3" style="height:220px"><canvas data-ch="flow" role="img" aria-label="กราฟผู้ลงทะเบียนต่อ 15 นาที"></canvas></div></div>' +
+      '<div class="d-grid d-b"><div class="panel"><div class="panel-title">' + dt('flowTitle') + '</div><p class="panel-sub" data-peak>' + dt('staff') + '</p><div class="relative mt-3" style="height:220px"><canvas data-ch="flow" role="img" aria-label="' + dt('flowAria') + '"></canvas></div></div>' +
       '<div class="panel" data-days></div><div class="panel" data-feed></div></div>' +
       (embedded ? '' : '<div class="d-grid d-b"><div class="panel" data-lanes></div><div class="panel" data-mk></div><div class="panel" data-note></div></div>') + '</div>';
   }
   async refresh() {
     try {
       const [r] = await Promise.all([Backend.call('dashboard', { token: this.session.token }), this.ensureChart()]);
-      if (r.code === 'AUTH') { store.del(SESSION_KEY); toast('หมดเวลาเข้าสู่ระบบ กรุณาใส่ PIN ใหม่', 'err'); setTimeout(() => location.reload(), 1500); return; }
+      if (r.code === 'AUTH') { store.del(SESSION_KEY); toast(dt('sessionOut'), 'err'); setTimeout(() => location.reload(), 1500); return; }
       if (!r.success) throw new Error(r.message);
       this.render(r.data.summary, r.data.destroyed);
       if (this.onUpdate) this.onUpdate(r.data);
@@ -1151,47 +1248,48 @@ class Dash {
     return '<div class="kpi' + (hero ? ' kpi-hero' : '') + '"><div class="kpi-label">' + label + '</div><div class="kpi-value tnum' + (changed ? ' bump' : '') + '">' + value + '</div><div class="kpi-sub">' + sub + '</div>' + (extra || '') + '</div>';
   }
   render(s, destroyed) {
-    const T = s.totals;
-    $('[data-banner]', this.root).innerHTML = destroyed ? '<div class="found" style="margin:0 0 14px;background:var(--success-soft)"><b>ข้อมูลส่วนบุคคลถูกทำลายแล้ว</b> เมื่อ ' + esc(String(destroyed.at).slice(0, 16).replace('T', ' ')) + ' น. จำนวน ' + nf(destroyed.records) + ' รายการ</div>' : '';
+    const T = s.totals, P = ' <small>' + dt('ppl') + '</small>', H = dt('hr'), en = Lang.get() === 'en';
+    $('[data-banner]', this.root).innerHTML = destroyed ? '<div class="found" style="margin:0 0 14px;background:var(--success-soft)">' + dt('destroyed')(esc(String(destroyed.at).slice(0, 16).replace('T', ' ')), nf(destroyed.records)) + '</div>' : '';
     $('[data-kpis]', this.root).innerHTML =
-      this.kpi('reg', 'ผู้ลงทะเบียนรวมทุกวัน', nf(T.registrations) + ' <small>คน</small>', 'รวม ' + CONFIG.DAYS.length + ' วันกิจกรรม', '', true) +
-      this.kpi('today', 'ลงทะเบียนวันนี้', nf(T.today) + ' <small>คน</small>', s.timeline.peak.count ? 'ช่วงพีค ' + s.timeline.peak.label + ' น.' : '') +
-      this.kpi('mk', 'ยินยอมรับข่าวสาร', T.marketingPct + '%', nf(T.marketing) + ' คน นำไปทำ Remarketing ได้') +
-      this.kpi('pace', 'ลงทะเบียน 15 นาทีล่าสุด', nf(T.pace) + ' <small>คน</small>', 'อัปเดตอัตโนมัติ') +
-      this.kpi('dup', 'สิทธิ์ต่อท่าน', '1 <small>ครั้ง</small>', 'เลขบัตรหรือเบอร์ซ้ำ ระบบไม่รับ ตลอด 4 วัน');
+      this.kpi('reg', dt('kTotal'), nf(T.registrations) + P, dt('kTotalSub')(CONFIG.DAYS.length), '', true) +
+      this.kpi('today', dt('kToday'), nf(T.today) + P, s.timeline.peak.count ? dt('kPeak')(s.timeline.peak.label) : '') +
+      this.kpi('mk', dt('kMk'), T.marketingPct + '%', dt('kMkSub')(nf(T.marketing))) +
+      this.kpi('pace', dt('kPace'), nf(T.pace) + P, dt('kAuto')) +
+      this.kpi('dup', dt('kDup'), dt('kDupVal'), dt('kDupSub'));
     setTimeout(() => $$('.bump', this.root).forEach(e => e.classList.remove('bump')), 900);
 
     const h = Handover.get(), step = destroyed ? 5 : h && h.confirmed ? 4 : h ? 3 : 1;
-    $('[data-privacy]', this.root).innerHTML = '<div class="panel-title">ความปลอดภัยข้อมูล</div><p class="panel-sub">Dashboard นี้แสดงเฉพาะตัวเลขรวม</p>' +
-      '<div class="big tnum">' + nf(T.registrations) + '</div><div class="text-[13px]" style="color:rgba(255,255,255,.75)">รายชื่อที่เก็บแบบเข้ารหัส</div>' +
-      '<ul><li>' + ICON.check + 'ไม่แสดงชื่อ เลขบัตร เบอร์ หรืออีเมลของใครบนหน้านี้</li><li>' + ICON.check + 'ทุกหน้าของทีมงานต้องใส่ PIN</li><li>' + ICON.check + 'จบกิจกรรม ส่งมอบให้ AXTRA Club แบบเข้ารหัส แล้วทำลายทั้งหมด</li></ul>' +
-      '<div class="cycle">' + [['ระหว่างงาน', 'เก็บแบบเข้ารหัส'], ['ส่งมอบ', 'ไฟล์ล็อกรหัส'], ['ยืนยันรับ', 'ใบส่งมอบ'], ['ทำลาย', 'มีหนังสือรับรอง']].map((x, i) => '<div class="' + (i + 1 < step ? 'done' : i + 1 === step ? 'on' : '') + '"><b>' + x[0] + '</b>' + x[1] + '</div>').join('') + '</div>';
+    $('[data-privacy]', this.root).innerHTML = '<div class="panel-title">' + dt('pvTitle') + '</div><p class="panel-sub">' + dt('pvSub') + '</p>' +
+      '<div class="big tnum">' + nf(T.registrations) + '</div><div class="text-[13px]" style="color:rgba(255,255,255,.75)">' + dt('pvBig') + '</div>' +
+      '<ul>' + dt('pvList').map(x => '<li>' + ICON.check + x + '</li>').join('') + '</ul>' +
+      '<div class="cycle">' + dt('cycle').map((x, i) => '<div class="' + (i + 1 < step ? 'done' : i + 1 === step ? 'on' : '') + '"><b>' + x[0] + '</b>' + x[1] + '</div>').join('') + '</div>';
 
     if (window.Chart) {
       const css = getComputedStyle(document.documentElement), v = k => css.getPropertyValue(k).trim();
       Chart.defaults.font.family = v('--font'); Chart.defaults.color = v('--muted');
       const tl = s.timeline, pt = ctx => (ctx.dataIndex === ctx.chart.data.labels.length - 1 ? 4 : 0);
-      this.chart('cum', 'line', tl.labels, [{ label: 'ลงทะเบียน', data: tl.cum, borderColor: v('--primary'), backgroundColor: v('--primary'), borderWidth: 2, pointRadius: pt, pointBorderColor: '#fff', pointBorderWidth: 2, tension: 0.25 }], v, true);
-      this.chart('flow', 'bar', tl.labels, [{ label: 'ลงทะเบียน', data: tl.regs, backgroundColor: v('--primary'), hoverBackgroundColor: v('--primary-strong'), maxBarThickness: 24, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom' }], v, false);
+      this.chart('cum', 'line', tl.labels, [{ label: dt('series'), data: tl.cum, borderColor: v('--primary'), backgroundColor: v('--primary'), borderWidth: 2, pointRadius: pt, pointBorderColor: '#fff', pointBorderWidth: 2, tension: 0.25 }], v, true);
+      this.chart('flow', 'bar', tl.labels, [{ label: dt('series'), data: tl.regs, backgroundColor: v('--primary'), hoverBackgroundColor: v('--primary-strong'), maxBarThickness: 24, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom' }], v, false);
     }
-    $('[data-peak]', this.root).textContent = s.timeline.peak.count ? 'ช่วงพีค ' + s.timeline.peak.label + ' น. ลงทะเบียน ' + nf(s.timeline.peak.count) + ' คน ใช้วางกำลังคนที่จุดลงทะเบียน' : 'ใช้วางกำลังคนที่จุดลงทะเบียน';
-    this.bars('[data-days]', 'ยอดลงทะเบียนรายวัน', 'ทั้ง ' + CONFIG.DAYS.length + ' วันกิจกรรม', s.days.map(x => [x.label, x.count]), T.registrations);
+    $('[data-peak]', this.root).textContent = s.timeline.peak.count ? dt('peakLine')(s.timeline.peak.label, nf(s.timeline.peak.count)) : dt('staff');
+    const dayLabel = (x, i) => en ? Number(x.day.slice(8, 10)) + ' ' + MON.en[Number(x.day.slice(5, 7)) - 1] : x.label;
+    this.bars('[data-days]', dt('daysTitle'), dt('daysSub')(CONFIG.DAYS.length), s.days.map((x, i) => [dayLabel(x, i), x.count]), T.registrations);
     if (!this.embedded) {
-      $('[data-lanes]', this.root).innerHTML = '<div class="panel-title">ช่วงพีควันนี้</div><p class="panel-sub">ใช้วางกำลังคนที่จุดลงทะเบียน</p><div class="mt-4 text-4xl font-semibold tnum">' + (s.timeline.peak.count ? esc(s.timeline.peak.label) + ' <span class="text-xl">น.</span>' : '–') + '</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + (s.timeline.peak.count ? 'ลงทะเบียน ' + nf(s.timeline.peak.count) + ' คนใน 15 นาที' : 'ยังไม่มีข้อมูลวันนี้') + '</p>';
-      $('[data-mk]', this.root).innerHTML = '<div class="panel-title">ยินยอมรับข่าวสาร</div><p class="panel-sub">รายชื่อที่ติดต่อชวนสมัครสมาชิกต่อได้</p><div class="mt-4 text-4xl font-semibold tnum">' + T.marketingPct + '%</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + nf(T.marketing) + ' จาก ' + nf(T.registrations) + ' คน</p>';
-      $('[data-note]', this.root).innerHTML = '<div class="panel-title">ข้อมูลที่เก็บ</div><p class="panel-sub">เท่าที่จำเป็นต่อการติดต่อกลับ</p><ul class="mt-3 grid gap-1.5 text-[14px]" style="color:var(--ink-2)"><li>• ชื่อ-นามสกุล</li><li>• เลขบัตรประชาชน หรือเลข Passport</li><li>• เบอร์มือถือ</li><li>• อีเมล (ไม่บังคับ)</li><li>• ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา</li></ul>';
+      $('[data-lanes]', this.root).innerHTML = '<div class="panel-title">' + dt('peakTitle') + '</div><p class="panel-sub">' + dt('staff') + '</p><div class="mt-4 text-4xl font-semibold tnum">' + (s.timeline.peak.count ? esc(s.timeline.peak.label) + (H ? ' <span class="text-xl">' + H.trim() + '</span>' : '') : '–') + '</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + (s.timeline.peak.count ? dt('peakIn')(nf(s.timeline.peak.count)) : dt('noToday')) + '</p>';
+      $('[data-mk]', this.root).innerHTML = '<div class="panel-title">' + dt('mkTitle') + '</div><p class="panel-sub">' + dt('mkSub') + '</p><div class="mt-4 text-4xl font-semibold tnum">' + T.marketingPct + '%</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + dt('mkOf')(nf(T.marketing), nf(T.registrations)) + '</p>';
+      $('[data-note]', this.root).innerHTML = '<div class="panel-title">' + dt('noteTitle') + '</div><p class="panel-sub">' + dt('noteSub') + '</p><ul class="mt-3 grid gap-1.5 text-[14px]" style="color:var(--ink-2)">' + dt('noteList').map(x => '<li>• ' + x + '</li>').join('') + '</ul>';
     }
     const feed = s.recent.map(x => {
-      const k = x.ms + x.detail, isNew = this.seen.size && !this.seen.has(k);
-      return { k, html: '<li' + (isNew ? ' class="new"' : '') + '><time class="tnum">' + esc(x.at) + '</time><i style="background:var(--primary)"></i><span class="truncate"><b>ลงทะเบียนใหม่</b> ' + esc(x.detail) + '</span></li>' };
+      const k = x.ms + '|' + x.at, isNew = this.seen.size && !this.seen.has(k);
+      return { k, html: '<li' + (isNew ? ' class="new"' : '') + '><time class="tnum">' + esc(x.at) + '</time><i style="background:var(--primary)"></i><span class="truncate"><b>' + dt('feedNew') + '</b></span></li>' };
     });
     this.seen = new Set(feed.map(f => f.k));
-    $('[data-feed]', this.root).innerHTML = '<div class="panel-title">ความเคลื่อนไหวล่าสุด</div><p class="panel-sub">ไม่แสดงชื่อหรือเบอร์ของลูกค้า</p><ul class="feed">' + (feed.length ? feed.slice(0, this.embedded ? 9 : 12).map(f => f.html).join('') : '<li class="empty">ยังไม่มีรายการ</li>') + '</ul>';
+    $('[data-feed]', this.root).innerHTML = '<div class="panel-title">' + dt('feedTitle') + '</div><p class="panel-sub">' + dt('feedSub') + '</p><ul class="feed">' + (feed.length ? feed.slice(0, this.embedded ? 9 : 12).map(f => f.html).join('') : '<li class="empty">' + dt('feedEmpty') + '</li>') + '</ul>';
   }
   bars(sel, title, sub, items, total) {
     const max = Math.max.apply(null, items.map(i => i[1]).concat([1]));
     $(sel, this.root).innerHTML = '<div class="panel-title">' + title + '</div><p class="panel-sub">' + sub + '</p>' +
-      (items.length ? '<div class="bars">' + items.map(i => '<div class="bar-row"><span class="bar-label">' + esc(i[0]) + '</span><span class="bar-val tnum">' + nf(i[1]) + (total ? '<small>' + pct(i[1], total) + '%</small>' : '') + '</span><span class="bar-track"><span class="bar-fill" style="width:' + ((i[1] * 100) / max) + '%"></span></span></div>').join('') + '</div>' : '<p class="empty">ยังไม่มีข้อมูล</p>');
+      (items.length ? '<div class="bars">' + items.map(i => '<div class="bar-row"><span class="bar-label">' + esc(i[0]) + '</span><span class="bar-val tnum">' + nf(i[1]) + (total ? '<small>' + pct(i[1], total) + '%</small>' : '') + '</span><span class="bar-track"><span class="bar-fill" style="width:' + ((i[1] * 100) / max) + '%"></span></span></div>').join('') + '</div>' : '<p class="empty">' + dt('noData') + '</p>');
   }
   chart(key, type, labels, datasets, v, endLabels) {
     const el = $('[data-ch="' + key + '"]', this.root);
@@ -1205,7 +1303,7 @@ class Dash {
     this.charts[key] = new Chart(el, {
       type, data: { labels, datasets }, plugins,
       options: { responsive: true, maintainAspectRatio: false, animation: { duration: 300 }, interaction: { mode: 'index', intersect: false }, layout: { padding: { top: 18, right: 6 } },
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: v('--secondary'), padding: 10, cornerRadius: 10, boxPadding: 4, titleFont: { weight: '600' }, callbacks: { title: it => it[0].label + ' น.', label: it => ' ' + it.dataset.label + ' ' + nf(it.parsed.y) } } },
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: v('--secondary'), padding: 10, cornerRadius: 10, boxPadding: 4, titleFont: { weight: '600' }, callbacks: { title: it => it[0].label + dt('hr'), label: it => ' ' + it.dataset.label + ' ' + nf(it.parsed.y) } } },
         scales: { x: { grid: { display: false }, border: { color: v('--line') }, ticks: { maxRotation: 0, autoSkipPadding: 14 } },
           y: { beginAtZero: true, grid: { color: v('--line'), drawTicks: false }, border: { display: false }, ticks: { precision: 0, padding: 8 } } } }
     });
@@ -1371,12 +1469,12 @@ const Poster = {
 const Kit = {
   render(root) {
     const url = State.url({ p: 'register' });
-    root.innerHTML = '<section><h2 class="text-xl font-semibold">QR ลงทะเบียน</h2><p class="panel-sub">ใช้ QR เดียวกันทุกจุด พิมพ์ได้หลายป้าย ตั้งที่จุดไหนก็ได้</p><div class="kit mt-4"><div class="kit-card"><div class="font-semibold">QR ลงทะเบียน</div><div class="text-[12.5px] muted">ใช้ได้ทุกจุด</div>' + qrSVG(url, 2) +
-      '<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" data-dl>ดาวน์โหลดโปสเตอร์</button><button type="button" class="btn-link text-[13px] mt-2" data-copy>คัดลอกลิงก์</button></div></div></section>';
+    root.innerHTML = '<section><h2 class="text-xl font-semibold">' + dt('kitH') + '</h2><p class="panel-sub">' + dt('kitSub') + '</p><div class="kit mt-4"><div class="kit-card"><div class="font-semibold">' + dt('kitCard') + '</div><div class="text-[12.5px] muted">' + dt('kitAny') + '</div>' + qrSVG(url, 2) +
+      '<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" data-dl>' + dt('kitDl') + '</button><button type="button" class="btn-link text-[13px] mt-2" data-copy>' + dt('kitCopy') + '</button></div></div></section>';
     root.addEventListener('click', async e => {
       const d = e.target.closest('[data-dl]');
-      if (d) { setBusy(d, true, 'กำลังสร้าง…'); await Poster.download({ title: 'สแกนลงทะเบียน', sub: 'กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอกับเจ้าหน้าที่', url, foot: 'ลงทะเบียนร่วมกิจกรรม', foot2: 'AXTRA Club' }, 'QR_Register.png'); setBusy(d, false); }
-      if (e.target.closest('[data-copy]')) { try { await navigator.clipboard.writeText(url); toast('คัดลอกลิงก์แล้ว'); } catch (err) { prompt('คัดลอกลิงก์นี้', url); } }
+      if (d) { setBusy(d, true, dt('making')); await Poster.download({ title: 'สแกนลงทะเบียน', sub: 'กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอกับเจ้าหน้าที่', url, foot: 'ลงทะเบียนร่วมกิจกรรม', foot2: 'AXTRA Club' }, 'QR_Register.png'); setBusy(d, false); }
+      if (e.target.closest('[data-copy]')) { try { await navigator.clipboard.writeText(url); toast(dt('copied')); } catch (err) { prompt(dt('copyPrompt'), url); } }
     });
   }
 };
@@ -1387,13 +1485,8 @@ const Kit = {
 const app = () => $('#app');
 const topbar = (title, right) => '<header class="topbar"><div class="mx-auto max-w-[1440px] px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2"><img class="topbar-logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club"><div class="min-w-0"><div class="text-[12.5px] leading-tight" style="color:rgba(255,255,255,.7)">' + esc(State.config.eventName) + '</div><div class="text-[16px] font-semibold leading-tight">' + title + '</div></div><div class="ml-auto flex flex-wrap items-center gap-2">' + right + '</div></div></header>';
 
-const SECURITY_HTML = '<div class="panel-title">ความปลอดภัยข้อมูล 5 ชั้น</div><p class="panel-sub">ออกแบบให้ข้อมูลลูกค้าปลอดภัยตั้งแต่กรอกจนทำลาย</p><div class="layers">' +
-  [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) และความยินยอม 2 ข้อ ไม่เก็บข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
-    ['เข้ารหัสก่อนบันทึก', 'ข้อมูลส่วนตัวถูกล็อกก่อนเข้าฐานข้อมูล ใครเปิดฐานข้อมูลก็อ่านไม่ออก ระบบใช้บัญชีแยกเฉพาะงานนี้'],
-    ['ให้เห็นเท่าที่จำเป็น', 'Dashboard มีแต่ตัวเลขรวม เลขบัตรไม่แสดงบนหน้าจอใดเลย หน้าจอลูกค้าแสดงเบอร์แค่ 4 ตัวท้าย ทุกหน้าของทีมงานต้องใส่ PIN'],
-    ['ส่งมอบแบบเข้ารหัส', 'ไฟล์ล็อกด้วยรหัสผ่าน AES-256 ส่งไฟล์กับรหัสคนละช่องทาง มีใบส่งมอบพร้อมรหัสตรวจสอบไฟล์'],
-    ['ทำลายหลังส่งมอบ', 'ลบฐานข้อมูล ระบบ หน้าเว็บ และสำเนาทั้งหมด พร้อมหนังสือรับรองการทำลายข้อมูล']]
-    .map((x, i) => '<div class="layer"><i>' + (i + 1) + '</i><div><b>' + x[0] + '</b><span>' + x[1] + '</span></div></div>').join('') + '</div>';
+const securityHTML = () => '<div class="panel-title">' + dt('secH') + '</div><p class="panel-sub">' + dt('secSub') + '</p><div class="layers">' +
+  dt('sec').map((x, i) => '<div class="layer"><i>' + (i + 1) + '</i><div><b>' + x[0] + '</b><span>' + x[1] + '</span></div></div>').join('') + '</div>';
 
 const Views = {
   async customer(params) {
@@ -1405,27 +1498,30 @@ const Views = {
     await State.loadConfig();
     const session = await Gate.require(app(), 'Live Dashboard', ['client', 'admin']);
     const admin = session.role === 'admin';
-    app().innerHTML = topbar('Live Dashboard', '<span class="live" style="color:rgba(255,255,255,.85)"><i></i><span data-live>กำลังโหลด…</span></span>' +
-      (admin ? '<nav class="flex gap-1" role="tablist"><button class="tab" role="tab" aria-selected="true" data-tab="dash">Dashboard</button><button class="tab" role="tab" aria-selected="false" data-tab="kit">QR ลงทะเบียน</button><button class="tab" role="tab" aria-selected="false" data-tab="data">ส่งมอบ & ทำลายข้อมูล</button></nav>' : '') +
-      (Backend.mode === 'demo' ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>จำลองคนลงทะเบียน</span></button>' : '') +
-      '<button type="button" class="tb-btn" data-logout>ออกจากระบบ</button>') +
+    app().innerHTML = topbar('Live Dashboard', langSwitch() + '<span class="live" style="color:rgba(255,255,255,.85)"><i></i><span data-live>' + dt('loading') + '</span></span>' +
+      (admin ? '<nav class="flex gap-1" role="tablist"><button class="tab" role="tab" aria-selected="true" data-tab="dash">Dashboard</button><button class="tab" role="tab" aria-selected="false" data-tab="kit">' + dt('tabKit') + '</button><button class="tab" role="tab" aria-selected="false" data-tab="data">' + dt('tabData') + '</button></nav>' : '') +
+      (Backend.mode === 'demo' ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>' + dt('simOn') + '</span></button>' : '') +
+      '<button type="button" class="tb-btn" data-logout>' + dt('logout') + '</button>') +
       '<main class="mx-auto max-w-[1440px] px-4 py-5"><div data-pane="dash"></div><div data-pane="kit" hidden></div><div data-pane="data" hidden></div></main>';
+    let curTab = 'dash';
+    bindLangSwitch(app(), u => { if (Backend.mode === 'demo') { if (Demo.simulating()) u.searchParams.set('sim', '1'); else u.searchParams.delete('sim'); } if (curTab !== 'dash') u.searchParams.set('tab', curTab); else u.searchParams.delete('tab'); });
     if (Backend.mode === 'demo') {
       const simBtn = $('[data-sim]');
-      const setSim = () => { const on = Demo.simulating(); simBtn.classList.toggle('on', on); $('span', simBtn).textContent = on ? 'หยุดจำลอง' : 'จำลองคนลงทะเบียน'; };
-      simBtn.onclick = () => { Demo.simulate(!Demo.simulating()); setSim(); if (Demo.simulating()) toast('กำลังจำลองคนลงทะเบียน เวลาเดินเร็วขึ้น 30 เท่า'); };
+      const setSim = () => { const on = Demo.simulating(); simBtn.classList.toggle('on', on); $('span', simBtn).textContent = on ? dt('simOff') : dt('simOn'); };
+      simBtn.onclick = () => { Demo.simulate(!Demo.simulating()); setSim(); if (Demo.simulating()) toast(dt('simToast')); };
       Demo.on(setSim);
-      const clk = () => { const t = new Date(Demo.clock() + 7 * 3600e3); $('[data-clock]').textContent = 'เวลาจำลอง ' + t.getUTCDate() + ' พ.ย. ' + pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes()) + ' น.'; };
+      const clk = () => { const t = new Date(Demo.clock() + 7 * 3600e3); $('[data-clock]').textContent = dt('simClock')(t.getUTCDate(), t.getUTCMonth() + 1, pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes())); };
       clk(); setInterval(clk, 1000);
       if (params.sim) { Demo.simulate(true); setSim(); }
     }
     const d = new Dash($('[data-pane=dash]'), { session });
-    d.onUpdate = x => { $('[data-live]').textContent = 'Live  อัปเดต ' + timeOf(x.generatedAt) + ':' + String(x.generatedAt).slice(17, 19); };
-    d.onError = () => { $('[data-live]').textContent = 'เชื่อมต่อไม่ได้ กำลังลองใหม่'; };
+    d.onUpdate = x => { $('[data-live]').textContent = dt('live')(timeOf(x.generatedAt) + ':' + String(x.generatedAt).slice(17, 19)); };
+    d.onError = () => { $('[data-live]').textContent = dt('offline'); };
     d.start();
     $('[data-logout]').onclick = () => { store.del(SESSION_KEY); location.reload(); };
     const loaded = {};
     $$('[data-tab]').forEach(t => t.onclick = () => {
+      curTab = t.dataset.tab;
       $$('[data-tab]').forEach(x => x.setAttribute('aria-selected', String(x === t)));
       $$('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== t.dataset.tab; });
       if (t.dataset.tab === 'kit' && !loaded.kit) { loaded.kit = 1; Kit.render($('[data-pane=kit]')); }
@@ -1437,31 +1533,33 @@ const Views = {
   async showcase() {
     await State.loadConfig();
     const demo = Backend.mode === 'demo';
-    const session = demo ? { token: 'demo.admin', role: 'admin' } : await Gate.require(app(), 'Prototype สำหรับนำเสนอ', ['admin']);
-    app().innerHTML = topbar('Prototype ระบบลงทะเบียน',
-      (demo ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>จำลองคนลงทะเบียน</span></button><button type="button" class="tb-btn" data-reset>เริ่มข้อมูลใหม่</button>' : '') +
-      '<button type="button" class="tb-btn" data-go="dashboard">เปิด Dashboard เต็มจอ</button><button type="button" class="tb-btn" data-go="data">ส่งมอบ & ทำลายข้อมูล</button>') +
+    const session = demo ? { token: 'demo.admin', role: 'admin' } : await Gate.require(app(), dt('protoGate'), ['admin']);
+    app().innerHTML = topbar(dt('protoTitle'), langSwitch() +
+      (demo ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>' + dt('simOn') + '</span></button><button type="button" class="tb-btn" data-reset>' + dt('reset') + '</button>' : '') +
+      '<button type="button" class="tb-btn" data-go="dashboard">' + dt('openDash') + '</button><button type="button" class="tb-btn" data-go="data">' + dt('tabData') + '</button>') +
       '<main class="mx-auto max-w-[1440px] px-4 py-5"><div class="show2">' +
-      '<div><div class="flex items-end justify-between gap-3 mb-3"><div><div class="font-semibold">1. มือถือลูกค้า</div><p class="panel-sub">สแกน QR จุดลงทะเบียน กรอกข้อมูล แสดงหน้าจอกับเจ้าหน้าที่</p></div><button type="button" class="btn-link text-[13px] whitespace-nowrap" data-newcust>ลูกค้าคนใหม่</button></div><div class="phone sm"><div class="phone-screen" data-phone></div></div></div>' +
-      '<div class="grid gap-4"><div class="panel"><div class="panel-title">ขั้นตอนหน้างาน</div><ol class="steps mt-3">' +
-      ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) ชาวต่างชาติกดปุ่ม EN มุมขวาบนได้', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ถ้าใช้เลขบัตรเดิมกับเบอร์ใหม่ ระบบไม่รับ ไม่แจกซ้ำ'].map(x => '<li><span>' + x + '</span></li>').join('') +
-      '</ol></div><div class="panel">' + SECURITY_HTML + '</div></div></div>' +
-      '<div class="mt-8"><div class="flex items-center justify-between gap-3 mb-3"><div><div class="font-semibold">2. Live Dashboard ที่แบรนด์เห็น</div><p class="panel-sub">ตัวเลขรวมเท่านั้น ไม่มีข้อมูลส่วนบุคคล</p></div><span class="live muted"><i></i><span data-live>Live</span></span></div><div data-dash></div></div></main>';
+      '<div><div class="flex items-end justify-between gap-3 mb-3"><div><div class="font-semibold">' + dt('phoneH') + '</div><p class="panel-sub">' + dt('phoneSub') + '</p></div><button type="button" class="btn-link text-[13px] whitespace-nowrap" data-newcust>' + dt('newCust') + '</button></div><div class="phone sm"><div class="phone-screen" data-phone></div></div></div>' +
+      '<div class="grid gap-4"><div class="panel"><div class="panel-title">' + dt('stepsH') + '</div><ol class="steps mt-3">' +
+      dt('steps').map(x => '<li><span>' + x + '</span></li>').join('') +
+      '</ol></div><div class="panel">' + securityHTML() + '</div></div></div>' +
+      '<div class="mt-8"><div class="flex items-center justify-between gap-3 mb-3"><div><div class="font-semibold">' + dt('dashH') + '</div><p class="panel-sub">' + dt('dashSub') + '</p></div><span class="live muted"><i></i><span data-live>Live</span></span></div><div data-dash></div></div></main>';
     const phone = new Cust($('[data-phone]'), { embedded: true });
-    $('[data-newcust]').onclick = () => { store.del(ME_KEY); phone.start(); toast('เริ่มเป็นลูกค้าคนใหม่แล้ว'); };
+    $('[data-newcust]').onclick = () => { store.del(ME_KEY); phone.start(); toast(dt('newCustToast')); };
     const d = new Dash($('[data-dash]'), { session, embedded: true });
-    d.onUpdate = x => { $('[data-live]').textContent = 'Live  ' + timeOf(x.generatedAt) + ' น.'; };
+    d.onUpdate = x => { $('[data-live]').textContent = dt('liveShort')(timeOf(x.generatedAt)); };
     d.start();
     $$('[data-go]').forEach(b => b.onclick = () => {
       if (demo) store.set(SESSION_KEY, { token: 'demo.admin', role: 'admin', expiresAt: Date.now() + 3600e3 });
       location.href = location.href.split('?')[0].split('#')[0] + '?p=dashboard' + (b.dataset.go === 'data' ? '&tab=data' : '');
     });
+    bindLangSwitch($('.topbar'), u => { if (demo && Demo.simulating()) u.searchParams.set('sim', '1'); });
     if (!demo) return;
     const simBtn = $('[data-sim]');
-    const setSim = on => { simBtn.classList.toggle('on', on); $('span', simBtn).textContent = on ? 'หยุดจำลอง' : 'จำลองคนลงทะเบียน'; };
-    simBtn.onclick = () => { Demo.simulate(!Demo.simulating()); setSim(Demo.simulating()); if (Demo.simulating()) toast('จำลองคนลงทะเบียน เวลาในงานเดินเร็วขึ้น 30 เท่า'); };
-    $('[data-reset]').onclick = () => { Demo.reset(); Handover.set(null); setSim(false); store.del(ME_KEY); State.config.regOpen = true; phone.start(); toast('รีเซ็ตข้อมูลตัวอย่างแล้ว'); };
-    const clk = () => { const t = new Date(Demo.clock() + 7 * 3600e3); $('[data-clock]').textContent = 'เวลาในงานจำลอง ' + pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes()) + ' น.'; };
+    const setSim = on => { simBtn.classList.toggle('on', on); $('span', simBtn).textContent = on ? dt('simOff') : dt('simOn'); };
+    simBtn.onclick = () => { Demo.simulate(!Demo.simulating()); setSim(Demo.simulating()); if (Demo.simulating()) toast(dt('simToast')); };
+    if (new URLSearchParams(location.search).get('sim')) { Demo.simulate(true); setSim(true); }
+    $('[data-reset]').onclick = () => { Demo.reset(); Handover.set(null); setSim(false); store.del(ME_KEY); State.config.regOpen = true; phone.start(); toast(dt('resetToast')); };
+    const clk = () => { const t = new Date(Demo.clock() + 7 * 3600e3); $('[data-clock]').textContent = dt('simClockShort')(pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes())); };
     clk(); setInterval(clk, 1000);
   }
 };
@@ -1471,10 +1569,11 @@ const Views = {
    ===================================================================== */
 (async function boot() {
   const params = await Backend.params();
+  document.documentElement.lang = Lang.get();
   if (Backend.mode === 'demo') {
     const b = $('#demo-bar'), base = location.href.split('?')[0].split('#')[0], onDash = /^(dashboard|admin)$/i.test(params.p || '');
     b.hidden = false;
-    b.innerHTML = 'โหมดตัวอย่าง: ข้อมูลจำลอง · ' + (onDash ? '<a href="' + base + '?p=register" style="text-decoration:underline">ไปหน้าลงทะเบียน</a>' : '<a href="' + base + '?p=dashboard&sim=1" style="text-decoration:underline">ดู Dashboard แบบเรียลไทม์</a>');
+    b.innerHTML = dt('demoBar') + (onDash ? '<a href="' + base + '?p=register" style="text-decoration:underline">' + dt('toReg') + '</a>' : '<a href="' + base + '?p=dashboard&sim=1" style="text-decoration:underline">' + dt('toDash') + '</a>');
   }
   const wide = window.matchMedia && window.matchMedia('(min-width: 900px)').matches;
   const p = String(params.p || (Backend.mode === 'demo' && wide ? 'showcase' : 'register')).toLowerCase();
