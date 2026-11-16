@@ -476,7 +476,7 @@ const CONFIG = {
   FRESH_MIN: 30,                        // หน้าจอเขียว "ลงทะเบียนสำเร็จ" แสดงภายในกี่นาทีหลังลงทะเบียน
   PDPA_TEXT: 'ข้าพเจ้าได้อ่านและรับทราบ {privacy} และยินยอมให้เก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อการลงทะเบียนร่วมกิจกรรม',
   PRIVACY_TEXT: 'นโยบายความเป็นส่วนตัว',
-  MARKETING_TEXT: 'ยินยอมให้ AXTRA Club ติดต่อเพื่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ ทางโทรศัพท์ SMS และอีเมล (ไม่บังคับ)',
+  MARKETING_TEXT: 'ยินยอมให้ AXTRA Club ติดต่อเพื่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ ทางโทรศัพท์ SMS และอีเมล (ข้อนี้ไม่บังคับ)',
   REFRESH_SEC: 10,
   LOGO: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAACrCAMAAADB593NAAAAwFBMVEXv9PUcYZxkkrnU2uqvy9/z1HL455zm6vIfcsGksN2jvdP8vhy4y+F/f38AAH9///+Fo70+gLhif79Cdp12f+6iqrEfOaxqoeVTjMXxv0EAAP8AVVU+gcL//3///6r+/v4dcLkAAAAkcbYZabD8wiMjbbHy9vv19/j9whzX5vBSh7UacsGUt9D19/irxtno6vN5pMb///+Iq8j5vSnj7PBrl7vG2+dEe6r++NVtm8Pwx0wrZ5v56qi61OTp6/P12oj2LhkJAAAAQHRSTlPf//8o////T/8L//8RAgIC//8J/wQGBAb//wED/wID/v8A/////3ec//////+i/4L/Af///////////////3f/7LgKtQAAHqdJREFUeNrtnQl/4jiywAMBkk56dmfn2N13xkiog48wBDAOEDrf/1s9lQ5bMtZhLvfrqGa6f91pMEb6uy6VSjdjLq+v4yBBTpJXkLZvuinxu729u/sWJIhLnrlUP7ijcnt7+6WksDWAgN/zzVOQICfIzcvz97uvAsJWAL6Ovz6H8QtyHgq/MQi9EaQA/jK+fQkjF+R8ED7fffFm8Ia+7mvgL8i5Gbz1RJACOA72N8j55QVM8f86Ebx5Hd+GwQpyETX47SsLcF0ABgMc5FIIUmfw9Q+HCQ4KMMglDfF4/KcdwLswSkEuKDQcsQUjN+PvYYyCXNYO2zzBAGCQqyhBM4B/hQEKcmklSAn8JQAYpDv5ZjLDAcAgnZrhAGCQ68hLM4EBwCDXcwS/BACDdBuKBACDdErgnwHAID+UDgwABrkugf8TAAzSYSz8pbYwHAAMclV5HgcAg3Qp33QCA4BBriy3418CgEE6DUT+HgAM0qkb+BoADNKd3I0DgEG6NcJ/BACDdGiE//YaAAzyQxjhAGCQTozwL68BwCA/gAoMAAbpKA75ewAwSHciV+QCgEG6UYF/cgIDgEE69QIDgEE6UoG8MjAAGKQj4eX5AcAgHclzADBItzYYCAwABuk0DAkABulKXgKAQTq3wQHAIJ3a4ABgkM7kewAwSLdOYPABg3TsBAYAf2SJ99livtls5ovFbL1yv36RbyrJF6ffwHwzVy44u4ATGAD8UWX9sEkIwaUQ1M/2DghJr3o97hWnPwA7rF5wcwEnsAsA36icX52f/P7VavXD0BdnCbAXISERCECY721vg9fJdyCcnHwbK34lIXh+7q/5fDYAB/MkKZKi8NDS7x/b7Xb40RLBWU6vX7/6vp8UyEsKKklWXcr4oiLpz7NZ3F5fwQDA2x/OMJr7DaL0pWkkeCIcQGAA4yQzPycI81dyXk8HMIbLpSmO4F7S8wP4ciYA436ppneZQ/t9TJaT6XK53L63+YBEXD3XHBTNQLhlt4Z35R7vQi3dnVVe2cqTZ2kPo0knnkS6iL/Tu8ssAEoCMTkPgIjge3nJswNIo5BzALjm3xu0dUrI2vraj8n0cTqZLKePLQiMEU4jevEU9frVTzfyU91CX0b/3w3ou7Ieoo+z4VXicmDsinnc5vmQlFB1NThtzucEl9eKlMsSABBzNZgMjAAS+I/A7+cBkF4qIpcywTdfzwHgCvjDYsAcd/k+oQBOhLz788cRgsuXT3+GD5WEUegL6Zzs4VoEOV6L2TTbFE1dEoxS+WaE+6cM5gxhxw2yB4TMjSaYP5VRdC4AkZzZCwD4dHsOAHP6rauHFiOb5hgup1T/wS8qnjow3hFpgOj0ytBuvaOYtAIwAgBnGPm8HiaSKho/JZjh6kYoPw4bYJX+zvl8cCRwsW8EUAH1XCa4uuD5Abw7A4AxqcaMWQmL4njbMvg4f9QZ9CFwzXQWlgZITi+1ehih1gBmfgDCtanzjbxcwaJU0GyeyNHzFCc9BM4+9rlBktmDkE8D4FzhANwXjMyvHVH+BH1TTwK5/Y0I14B0FAbiU6M2QmD80Jobbj+hAFJ15kHgA9XL4v44gCg+drrZV8VuvY4B093i8lEw+fEBpKOmPP3wP55ZAVwKBTil/7kJXEurUkZ3DMA9iVJF6/gBmDz5a0D2JmL9MpUHWD4gYqIWp/CHiI8Vpi9qAOL/HYDfTwcwAwccqVNt+eJvWwog14FT0IVLF4Ex4w+rlgdMcFxAWNwCJRZWZBJA5M0ffa1Lnc1wpAAI84WPUoH0O9E3V2lnexyC4AMPiPiMACZEA5COS4rN2foh2F2hAXk4bI1EuP5DpXpBwrHJMTN1kS+EXAHeCACJP7kenlROn4XqkjBfiGTH6T/SZGvrf6LfWyQEDv3tTwjgjPDYQBmeCOe2NAwPgh+ZHoSMoIXAvTBKYsQZRmAS1wQmnc1AGTJAghbV3HQkZ44lKAdCYUdlJqZMHrH8Ln8L5LyIqmywnaY1iZQsgIjDjpj6BNdUH8vmMX2YsjwgkqlB5e7rScdPCGBCUagUlMhgkNjmBU4khFzMGel1D0d15Tp/Kh05vkypTVmkOKPy37hNw7vB01PdByynUs2x6SbfaVA3GOlxDcSxu9Z1I6DT+TgieRUM8XAlEV+aU0YbnnU953N+APFlAfzrVABnO6RYSKmNbF74ByOQOYAyHDYQuC4AEB3uXGgdHNVXz6KaPSZcpbF/ghXUfemyqi4gFtpPvI6tfMJEE1KiaI8pYoQPHDTcfu4zwnS49iCklD+U5PkiW8zzBBHxzxURLD2VeAB4M9OkaTFBf0Vs14DxbJYtFossm+27BnCDtQBQ3qlNaXxMRC6m1IHTxkhEBoVqZkuOQIZ2pC6atqSqga1H8d//sRkoMVN1yRRrV2AvF+uwypey5ZWeFgdRNZuxlsnoRgcQk35WjWO8nyNqEdIa6/rjYQAw6VXr37verqGYYdZTXoJ7i2YA2Y/3iwQpNWJ5tu4QwDWRwWJt7GxKA5aDl4oVnjbqQFhgTtVUyz1Sfcv4QBItCbtR/0kP2ksAaYBxeJl9lhMdqtSSilkdKEBw1+hb8pYGOFUfY3BxMcnrMws1WkT/qBrrBgD/je+VRXHUBCCRRVxs0TczacD1vBCPKBuZFIwHsdXnXBhA7rk0AGhTGlAQs1wqAE4aamMOTdu9Y1J1ABfmrJEKYHPsU9BBLxd3rTQZ89q7NpmYAUVWXaMGc5w0KpYFwbXwPlW/hEkD4nuu3xGr6Fg155LoC7hFMAAY4X/PkfRFhXERpRtoEXcCILMcJDpMrMn1ChOBy8r+Nlthkf9Tr+tygSEfXAWIPgBGprqBVaKVQ1kepwIbFvJaOewJ1gcRYWK6/3WiDQrVVmlv5gawTFPCvTUCmFbJNBOAoO7og8IdZwJuCvjTTGW2qNw4J4CwCs+zte2yZ5TAKgqm+m9at8KMvzIvgbxCsERxR301oKlw5QZhzfasjUmohpRi6q7JOEhlwY2jKrKwrADe9NVUOrX3qgo0Aii/DKyfmDQgqUbPACCl7p66fSLq1NxRsuvH1wdQMZOIrYeW45I6lrAogdwG819TvTprtYM8XxkVUrvhoVGYaiAuJ9THBMP6bk/JrptTgRR6omSJ1LnCWQsFiMRIQi0N1TDEGlz2cS3gr8yNAcB+dZtGAFGl9M0AonqOSouHBtcGMFNSv2LJonLYHFVxH0om8LA6a9HjYSyRF8Wbp6sCCM8WcdrTNdEWgZC3G6zrNKJUc7BgfOax+KyWL+b+AEZWALEDQFt1BHJWw58dwModYXYDR6VGhOSgI0XEdGC5KDypVSZQAiNBIP2FfPZjnRfAXKus25iT0FhNlCs1Ez5lDPKjqnQToUj3XPO4KsryX/5Jpbk3AlhiRKwARscCKB6e7KoADqrhp+OG0X8r3x4jp846zAeqVnjB/HI+p34evQogOhnABU6VCclNSSglKCXoHzgqy5mJfzJapQYG0p3B2RO+JMzcMfr2EtlTTfApAML7e9k1AQQHSA43dfrmAzUPEtnW46QOXE6nWjS83I7Kf51jWJKA5bd7v4jyvBowwyl2ATiH9FqVLUxiVK2yENU1s9OkZtApTiT2UZqwWUj56EOn/OoAMo1MHq4HIH3+FZOb0kixMsnIlYzmBP7HUnUEa9VZCyj5ow+4J3/nB9ClAWOklj/A+m+u2wA/FTjX8ype3zbuoXs17pY2uEsNCLNO2u5HOAXAuVZ9AkFHud8CE6/C4LeRsiAilKEaiWA6stbamgsCuMD3LgAzfQASllBWVuRYBbZbCqzW83qmbxY9bSG893AeAP2DEFz/MxbVIsm1AIwRltUbrNpkr+Sb2O/InYh4+xDF+TwQmU51K5yRNvtszwtgokX4c0OgrBDIvi2PT4nYQ+CnzPSVJM+vu/p1M9/MuSzm8/zGkQc8C4CI2yRR4CYzgYjHiqxQDLctBz8BwAUs78jCNTGVfHtYynQxfRg8epOIbMy0cgbVNZHBJt94FzadFcBYG/bGq816SsWXqJyeKfWzyE+b7TVmED5pV/FlNSARAKZKKVLKrkjkt4ZavPV1ACzU9XNxy7CAgcvEDPLZ0fNRmWDpDbbqmXAhAOeKC0iaMypJtSsAFqP61dJcWZ/mow20AkWMj93QdCUTzIqOoEpsAVVb/aTyHAkPijBqVYdxPIAZBL7KaumqdKjBpKQNtWoWAqc6gZP3rgFc79SFpsbAdLaDai5ZoCzBYbELEtWE1Aa4WybNVRfw1K2UFwaQTSvGRVUlFs/lGo58b7tStOMBTKBKpMw6yPmGSlEiNTW9lZkXgZPHqQrgdHqUDjwjgAMESxzEurBNJzWtFsJl1pOXZxHh13m4wRA5E79S3u4BZM5+rU4ihoHQqmTb1GEcDWAZ8CK9ar2PhTLmu8m9tPHHcvn4qGnA6fDtOgA2rhfGc9EPxVbbtS7z5Owzd4PSNVZWxX0UGgBYZbNOcwHPBmBjQSorTmpY8V30SKr2E2njRhwNYCIjQKQvVVHDJKsqwHn30sZvkA/UarOmxxjh9gDSocoOZFMQrK7s4uZVxTlGUv0Rda7XhFdEI/6bez0uwdWWBjqRFwHQHQU/+ADIHrl9c9JeiQdQizqMYwFcy80qiPs8e801L0t/PJMKenUWdQkfl6OrABiRHuTTqpwa+6tWXIab1RirhMR86wkAOFNMc7mVHpKYfY9HudpT3CmA+FDlHwDYvNuK1SXj2tbZiwKYS/ePQB2jamkHSnIMRV7rSpTAodIxZgotEz6uA2BkaNImPR5W7NKkxRZlZxpc23+2JxGSEQzc0N4fQKhiOxXA6DgAtf36RgCN69SFspyI29RCHgngWqsRQ9pjwdrTVSUhXtr4fatHwdPJlTRg84KSXvPe+DwXZZ4a1n+1KpA+vleLiHP3bZf3050GZKs6LgDNZGWs80T5AWR/YQAXaiFqTeNmPXXrqk8ymvGn1iUsl8v37gCsd+doGs0HnCJlGbxQ52VG1A1GThuQqztv/Wu4ugFwY/lgFLkLeM8E4EpNP9KnNqt5R+XkgDrOfPiDjkVVWcLj8jpRsJs/ZLhSonzHNK29RKkS8khG5+qa34XSMGcywZaVhQVuXVBxAoBqqRKUo93U4kNtidTpkI62rF+MGoUsr5MHdBV3QEa90YTOcBqZ89QDbY9v43xrU6cBmPzAANZnWlP7Smlui8WQ4wBEOu5ZPUBUvMDI6dW8b6ea/gP5ePsRACTE9Pz0dWhqw32jdQFOHTZA29cQXWUpLm68C+wC0PZ0xOrYt3iMjgJwpuwYg64//bkqi7nWJ9b1NLxXPVMlg0cZ4EuYYNid28TDvmaYkrkuvKV6GYfZZ2OvFXUhXyfwV3YmEvyW09/6mS+A5BQAN1b00bUAVBMHJE0RqbdpSbU+FdZkNOWP7VGvCgI1/gbZbHVhAMtdpUjP+LNWuXOD26aEGZAorAmJ1FSUY4NgrHQBQd7Wa62fNSF7aZhNsKPZUtZs1Ly7Y6203iKXBXBW36cXycMSInTYXpFYGxqw+FffGzep+FvD6SBodlEAiaji0PxWXl9g2mwdE705K470AyFq+tVVo1ltymRdGPwypwtcHWCEKj/HvC/YAeADTiPXxnRrbHFFAHNsLY+t71C3JSJ4/k/ZE6Lpvz3rxePVpvlIAHl3CVLbYy1ufJfH5oiPIP8e1WhndYPnWG8t7qMCY6I6jlUbVw8AUdSsAX0AtPuAyvrDJQFcE2RF7iCQNK/HifyzQuB0WcUfe+HLY89me0euhFAfAqUNEch8bRxrojXPcudy7BsE17hyAyLP9fNc0zcVtGYfEJfa3QBghJoARHoUHNvM4pWi4A2OkO8JMbJKttmPG7G9wHr+RdF/qGw86rfd9BgAlcO5dC2Ymj9zwWoevfeKwQqv3ayq+slvVwXv5IIOIxczgCUehBiCkLI5iBFAyyFQ2s6qi+YBY8KrDCLvTIYpMf6+nU6WtW2Ziv+HsDigCnnu8T6qGkYGrvlO611Owyyj3uU3hvwBdDVr6+sARr2Fcw6IKPmtayYDgKrXRMfTUNyjLOc+NANo/B43mhfRYl9BewDnPaTtSbXvVSbm7Oqh/aX8KYZeWg1EkF/X79MKUue4tgps2mA4w6xnTZtG5zTKiK0RrRbUYee3TXCti7WrNYfaRZM06gO4pFCqMIqDxkS02Z3PtD7FLdeCv7dchSO8EQxyruejqigpa1r/kC0CSwa1/XDsi1OziFnnPI/Th06siJ6rB45xbBoJLFjQmqoNz4y6D8kUgd0mzWW3IVZwTBxb49aF2Pcgq3kULAwAqslu6mUWDY49ZNTKVujls1fzAU3RxVo9KyZClhWTkwGcs5SmPE8FWUxvZaVww1ceKemXQ/6eCpHK5aX9rFfbxbtj9XFa7igVhRSmfIWStzGNAdurWAFo9QKFW+NR9gSpUZbyZd+VvU0rujQAOFNzjaRBHyRSo8DavjJdOoARvm9u0pNgrdF7i21JbQGsyhBanBLTsIo9muj5F/jzSK9oEJXVWNYdO3vNnLwnRPSktjc5VHK6qCl903Cuh7vIIK81mqaaqDC4UYtyHwoRDKo9UAwAxkrTYdRQpKjszGNjnhsANByEx/YHkvarOUcAWN6psptaPWj3oKizeW1mVNsFB/7fQYfUe3bybZsOqScCuN+Resu7+eEqHDrsiaJ95eqPaaTEldaytBipaTgww/eYNJ1XPEiwOiY8IzZ3rgVrjw3ozF6s51BS3QvNnpp9QDbx9TGJE5xWR3WAsSqeLgagcjAz35RjOnK83jhaU4HAn9aXaHpYgbrmZwSTco0Au3Tg6bviHnRFhBoKCRL9NBxsHgGMtdPs7CUJ1LCrRYRsWz9GtS7lq4eE4Kh2LFWkOQomADOsd/HXsvsLdQ9qqu2rbGjNQZWzpuAyxHJCB3vELwLgrEras41vux1pPqF8t6ude6u4BW8H+T+K46hRK5TbS7iXbifwDNsy66bwICu8JvfqhNAB2CHTCNROT3Gtx6W1ZxYaL5NkMeM3AM37ET8LKtVd7d7MXQ1z2PIdk/6ARQpx9g+lr2N9VGrlWLKLayIPEllnBU8JyJvHLU/Kawmg8vyzzTrxyiBxvFoQvX9mOZMfQv0tJxPrTnThB6rFyVYCz7EvOCH6wZ9RLRCZ64WARQzftHkEVlr/aFcuEzY54foBDHBSDf3axe+/84IPOMBYTcHC2Ya6w288KSnHeu6WHYJTJAUcupDWd77NniwakBVpUEcgyfnhOfzgRHUfUJua2nYArrVSU/3Za8pXqE+q9FTeRrz8VLaHtuwAWaNqx6JIUNgIPAeAqrfO4ddeEssW8TzZ4LA1+gqsY38cdJqJaj1+I3EIArPnEErX4m5EXcXkyQvAPVZzY6yrZSSvW/M7VBfuAEC+dS7lBUDcP1K75LKKxqeLAbhRdhC6V5yzarcNSxjEVfwxURuyTY17MJlvLvd4YuWsuIsBCGuaqVgVFVZF/URI6Ka4qux0OSxaUOzIzmY9SDqxQzjgwA7uViGMcZnLkU2PxO0zB7CWqzSfFbfBKoDQWxWXy6WaVtUeq8N9wbiMu+SjgKuWnGphzgUAhLu5x5VOcwTbMVL6VcqNE7D+oRzRdZB/OSRQLJHJTlzmTz1Pa46FbL+cCn2jhg9IX/FcuD2WyH9/XL8nn7bGVRakm2fu9tdXa8wAxgRHjtUDltSuv8vcoLJhMaz9EVGtAFyohahR5Ay29dafXLMPl1ryjzqD1j3oXAcipf7GrHfP1BuGBSKl7mZu6KCMVfXT6FzOdqYftu1yzvMeO/iR+GwXZRmqw0o1y2mZbLcici1c18KuRgAtaz9pmxRMawCLw4aMDhV4kIl529a6kj+6T0wXR0xJX944jWcCEA5jT5U8p/KR0I+knMTUvTaz0je5O0esj8vFMGc/ZoKbDuawHdeaY8u1y29b2+LYCsAjzopvA6B+KIZrs5f0O3A1/pSJm4nSAqEx/9eoA9Xkm/E49nN1x9rDTlNNEYmXrXkvDtKcoTHYDKW5qNs6LXhVmNciU9q0Vm0DMC5warq0RLPerqldj+gU79qenAkA3vkmAeEoBn8H6Imf48AJZON/CKBPJ0CWD8TV2edGJ/ds7dmyHdK6PdFb3/CvE8nVL+zT9UVzg/0K/bKdXunXqHNk460GZWM9sJp51NgC4OEqbpuDamBUWm+rbweg1q7Vh/Uqb0jDOlDu1ARrAPp04IBxU3gwfvD5+gPmWLXBsPGKFUitWYUO75GM/HofKoV4JPU47elpn2BbuTk/wRHRJ3JnaFttOzF9jbBhCd/AX+NRXY3PBpTD4KL9ycEA4K1vEIyqFkjIZzCZzsDlNh+Whhiqjdg8e2BVpzkj2wlYHEDkAyCx9L0S6xK4PAEbswcgZlWX7FhV7L/zcE+Ug0P81ugXO9xsKMud36yRVfO1HFuD2JnKGDdpVYi2DqGOm4rfD9b6eXEU7h9xanAbAJ/6PdnCq7lSqXkm04idNS9m7B0Oap2yEzL9O/EKS8azVwubthFJLUuO+IHX8vE0mImimOD7iPV65Xl+EUAsqG1mJxT5ezvyGC6A2NNBh72AvOMtbvLT2NmopkFgIZssjmiKSOdEZmfre/fSpk2AMe94Ky+JseAP1Wq+QcUcdV7rdwrgF9/qwfUOmrFRpBDeeZa87neYNTmL7gl/yxs/JnPpE38on1yQ+xTdw+ybFc9DD0kHHqHe3vglxBYkGEZj8Tvct+KKpfdseFcFLxlE3hul5LODoITU20GaJQQ3FVuye6L4mQ9G1QpDG1MiswKW9A4zgJg0nZAda6XvbOXtPq2F4/x82fy4jg4A4N9efF99s2NqA/cS709bI9bysbIZb0N+KEO7PtA0gqNXuaefbEsT9eRp8rjXt2TbsNAu2JK0Wie8a6Uoq8L8APS44D/tFd415zFcCD5r18ZB3+e7njybHDOli8Qeql2SWQa/OqUgMpZFZTAlKJI7buDadNySmcEUqA/AZpDsJL9IOTCd5Punp2MBfB2/+HPQLxAq+q3OA1sk9FaL6qF9Gw23k+122LIDYEYvgxKrml/lhRjPwhai/ypOmyfIesTyLFdKW2QF0mqRENdtNN05KfKWDnqc9ZEo6mJ6nS++Jrlj/V2tTjJaiywh8uHi10Wm01ji36sLErRbwLAU5ZN5L27q1/XT0ykAtqrJj9ur2rj+njcq7e91Fa98PiqOnbfIXuNxubgU7Yc37QdgddTsrLOcPvBM6VIOkvks9hijVXXX5k+NB5uCV9gQOPLDfF1R26RdcE2fDfnmIs+Op08CePcU5MeVeABHwqxX57/yGi58ZDOuFXvz+uR7YADehln+BPL24dX07v2o1ninAfjHTZien5+/4XLi0fZudGRzxhMAHL+On8P8fAb+3KfwQYpisrwmgRzA72GCfnr++OkXE1vy4Q2aJcNOiSsSyAEMTuDPr//EqbiT7cfIgh9fqd9ej0AO4G/BCfwE+k/ugtgO3w/5Go22S7Y8xV94NQIBQErgX2GSfm79t5yWnXjYicyUwTIV+zZ6Hw2rJrV8t9i1CBQAhkzgTx9/sOXPshRuCWtRww8qw+FwK/51ovZKHr5dE8AvwQb/vPLB+AP7upTtAOhvj49LKo9LOJaq2qIod8tCLHw9AEMi5qeW9+1S6r2l1hBKb89Tnlo/ZfHylQEMcfBPTuCk1opCB1EXHoZc0QcEAl/CPP3UUfCj3ot2agZw6ZOxPj+AIQz5qQkcbZdTHUGzDpxeLQJRAQxhyM8toyHvyDN1AQilwqPrroQEFfgplODH1mp5K9M8HF3xtv6SAL4GFfgZEFy68Xu/6k1JAIMK/IQIytRfmQJcNq7SXQnA1y8hEP4ECL4Pq+P5KvJ47Lv9eLv6DZUAhlzgp2JwuWRR8fQR/oe1kO1wdPPWwd1UAI5f/xaWQz4Lg6PRx3C4FTIcDkfvbx3digLgL+PbEId8KgyldHkTCoAhDgnSMYDBCAfpEkCIQ4IRDtIdgMEIB+kWwLBBLkjHAL7+V3ADg3QHIJTFhAWRIN0BGAKRIN0CGAgM0i2AYVE4SLcABh0YpFsAA4FBugUQCAyxcJDuAAwEBrmSfG8GcPxl/CVkpIN0B+D47+OwLhykQwDHr8EMB+kSQHAEfwulCUG6A5ASGJRgkMvKnQ1AMMP/vAspwSCXk1srgEwJfv0WEAxyIXn54gBw/J+A4PeAYJALWeBXB4DMDo9vA4JBLqEA//XqBpAj+NtdCEeCnN8DfB17AMgRpGrwJejBIOc1wGM/AAFBxuDdc1CEQc5kf0H/eQMo1eD4n7d3356DKgxyotx8/8L4awFgqQfH43/dUgy/fXvW5UX8kn+1y+G/H1xBv7b6guqPL9W/vNR+avujcr/NP/WSF88XvRx82ovrj8/Gu2r4Xs+O1zZPFP80MRfsr9VPqp+2GA5tspqnWlzr291XVm/QFkDOoKAwSJATRFL0f0pxQLQ8uAlSAAAAAElFTkSuQmCC',
   CHART_JS: ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js'],
@@ -627,7 +627,7 @@ const Demo = (() => {
   const seqCode = n => 'A' + String(n).padStart(4, '0');   // รหัสเรียงลำดับ A0001, A0002, …
   function fakeReg(ms, lane) {
     return { ms, registeredAt: bkkIso(ms), firstName: pick(FN), lastName: pick(LN), phone: '0' + pick(['6', '8', '9']) + String(Math.floor(10000000 + rnd() * 89999999)),
-      email: rnd() < 0.6 ? 'guest' + Math.floor(rnd() * 99999) + '@example.com' : '', consentPdpa: true, consentMarketing: rnd() < 0.7,
+      email: 'guest' + Math.floor(rnd() * 999999) + '@example.com', consentPdpa: true, consentMarketing: rnd() < 0.7,
       lane: '', code: '' };
   }
   function seed() {
@@ -686,7 +686,8 @@ const Demo = (() => {
         if (!r.firstName) return inv('firstName', 'กรุณากรอกชื่อ');
         if (!r.lastName) return inv('lastName', 'กรุณากรอกนามสกุล');
         if (!r.phone) return inv('phone', 'เบอร์มือถือไม่ถูกต้อง (เช่น 081-234-5678)');
-        if (r.email && !validEmail(r.email)) return inv('email', 'รูปแบบอีเมลไม่ถูกต้อง');
+        if (!r.email) return inv('email', 'กรุณากรอกอีเมล');
+        if (!validEmail(r.email)) return inv('email', 'รูปแบบอีเมลไม่ถูกต้อง');
         if (!r.consentPdpa) return inv('consentPdpa', 'กรุณายอมรับนโยบายความเป็นส่วนตัว');
         const ex = db.regs.find(x => x.phone === r.phone);
         if (ex) return ok(regOut(ex), 'เบอร์นี้ลงทะเบียนแล้ว', 'ALREADY_REGISTERED');
@@ -796,12 +797,12 @@ const I18N = {
     phone: 'เบอร์มือถือ', phonePh: '08x-xxx-xxxx', email: 'อีเมล', optional: 'ไม่บังคับ',
     pdpa: 'ข้าพเจ้าได้อ่านและรับทราบ {privacy} และยินยอมให้เก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อการลงทะเบียนร่วมกิจกรรม',
     privacy: 'นโยบายความเป็นส่วนตัว',
-    marketing: 'ยินยอมให้ AXTRA Club ติดต่อเพื่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ ทางโทรศัพท์ SMS และอีเมล (ไม่บังคับ)',
+    marketing: 'ยินยอมให้ AXTRA Club ติดต่อเพื่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ ทางโทรศัพท์ SMS และอีเมล (ข้อนี้ไม่บังคับ)',
     secure: '<b>ข้อมูลของคุณปลอดภัย</b> ส่งผ่านการเชื่อมต่อที่เข้ารหัส ข้อมูลส่วนตัวถูกเข้ารหัสก่อนบันทึก ใช้เฉพาะกิจกรรมนี้ และจะถูกลบจากระบบนี้หลังจบกิจกรรม',
     submit: 'ลงทะเบียน', busy: 'กำลังลงทะเบียน…',
     e_firstName: 'กรุณากรอกชื่อ', e_lastName: 'กรุณากรอกนามสกุล',
     e_phoneReq: 'กรุณากรอกเบอร์มือถือ', e_phoneBad: 'เบอร์มือถือไม่ถูกต้อง ใส่ 10 หลัก เช่น 081-234-5678',
-    e_email: 'รูปแบบอีเมลไม่ถูกต้อง', e_emailDup: 'อีเมลนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)',
+    e_emailReq: 'กรุณากรอกอีเมล', e_email: 'รูปแบบอีเมลไม่ถูกต้อง', e_emailDup: 'อีเมลนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)',
     e_pdpa: 'กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนลงทะเบียน',
     e_fail: 'ไม่สำเร็จ กรุณาลองอีกครั้ง', e_busy: 'มีผู้ลงทะเบียนพร้อมกันจำนวนมาก กรุณากดอีกครั้ง', e_net: 'เชื่อมต่อไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วกดอีกครั้ง',
     okH: 'ลงทะเบียนสำเร็จ', okLead: 'แสดงหน้าจอนี้กับเจ้าหน้าที่ เพื่อรับคูปองที่เคาน์เตอร์ลงทะเบียน',
@@ -816,7 +817,7 @@ const I18N = {
     demoDash: 'ดู Dashboard แบบเรียลไทม์ (PIN 111111)', demoToast: 'กรอกเบอร์เดิมอีกครั้ง เพื่อดูหน้าที่ขึ้นเมื่อลงทะเบียนซ้ำ',
     pvSub: 'สำหรับการลงทะเบียนร่วมกิจกรรม AXTRA Club', pvOk: 'รับทราบ',
     pv: [
-      ['1. ข้อมูลที่เราเก็บ', '<p>ชื่อ-นามสกุล เบอร์โทรศัพท์มือถือ อีเมล (ถ้ามี) และการให้ความยินยอมของท่าน พร้อมวันเวลาที่ลงทะเบียน</p>'],
+      ['1. ข้อมูลที่เราเก็บ', '<p>ชื่อ-นามสกุล เบอร์โทรศัพท์มือถือ อีเมล และการให้ความยินยอมของท่าน พร้อมวันเวลาที่ลงทะเบียน</p>'],
       ['2. วัตถุประสงค์', '<ul><li>เพื่อลงทะเบียนร่วมกิจกรรมและยืนยันสิทธิ์ของท่าน (1 ท่านต่อ 1 สิทธิ์)</li><li>เพื่อติดต่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ เฉพาะกรณีที่ท่านให้ความยินยอม</li></ul>'],
       ['3. การเปิดเผยข้อมูล', '<p>ข้อมูลของท่านจะใช้โดย AXTRA Club และผู้ให้บริการระบบที่ได้รับมอบหมายเท่านั้น ซึ่งประมวลผลตามคำสั่งและไม่นำไปใช้เพื่อวัตถุประสงค์อื่น</p>'],
       ['4. ระยะเวลาการเก็บรักษา', '<p>ระบบลงทะเบียนนี้เก็บข้อมูลจนจบกิจกรรมและส่งมอบให้ AXTRA Club แล้วจึงลบข้อมูลออกจากระบบนี้ทั้งหมด AXTRA Club จะเก็บรักษาข้อมูลเท่าที่จำเป็นตามวัตถุประสงค์ข้างต้น</p>'],
@@ -833,12 +834,12 @@ const I18N = {
     phone: 'Mobile number', phonePh: '08x-xxx-xxxx or +country code', email: 'Email', optional: 'optional',
     pdpa: 'I have read and acknowledge the {privacy} and consent to the collection and use of my personal data for this event registration.',
     privacy: 'Privacy Policy',
-    marketing: 'I agree that AXTRA Club may contact me about membership, news, promotions and special offers by phone, SMS and email (optional).',
+    marketing: 'I agree that AXTRA Club may contact me about membership, news, promotions and special offers by phone, SMS and email. (This one is optional.)',
     secure: '<b>Your data is safe.</b> Sent over an encrypted connection. Your personal details are encrypted before storage, used only for this event, and deleted from this system after the event.',
     submit: 'Register', busy: 'Registering…',
     e_firstName: 'Please enter your first name.', e_lastName: 'Please enter your last name.',
     e_phoneReq: 'Please enter your mobile number.', e_phoneBad: 'Invalid mobile number. Use 10 digits, e.g. 081-234-5678, or add your country code, e.g. +65…',
-    e_email: 'Invalid email format.', e_emailDup: 'This email is already registered (one registration per person).',
+    e_emailReq: 'Please enter your email.', e_email: 'Invalid email format.', e_emailDup: 'This email is already registered (one registration per person).',
     e_pdpa: 'Please accept the Privacy Policy to register.',
     e_fail: 'Something went wrong. Please try again.', e_busy: 'Many people are registering right now. Please tap again.', e_net: 'No connection. Check your internet and try again.',
     okH: 'Registration complete', okLead: 'Show this screen to our staff to receive your coupon at the registration counter.',
@@ -853,7 +854,7 @@ const I18N = {
     demoDash: 'View the live dashboard (PIN 111111)', demoToast: 'Enter the same phone number again to see the duplicate screen.',
     pvSub: 'For AXTRA Club event registration', pvOk: 'Got it',
     pv: [
-      ['1. Information we collect', '<p>Your first and last name, mobile number, email (if provided), your consent choices, and the date and time of registration.</p>'],
+      ['1. Information we collect', '<p>Your first and last name, mobile number, email, your consent choices, and the date and time of registration.</p>'],
       ['2. Purposes', '<ul><li>To register you for the event and confirm your entitlement (one per person).</li><li>To contact you about membership, news, promotions and special offers, only if you have given consent.</li></ul>'],
       ['3. Disclosure', '<p>Your data is used only by AXTRA Club and its appointed system service provider, which processes it on AXTRA Club\'s instructions and for no other purpose.</p>'],
       ['4. Retention', '<p>This registration system keeps your data until the event ends and it has been handed over to AXTRA Club, after which it is deleted from this system entirely. AXTRA Club keeps it only as long as necessary for the purposes above.</p>'],
@@ -948,7 +949,7 @@ class Cust {
       this.field('firstName', esc(T('firstName')), '<input class="input" id="' + this.id('firstName') + '" name="firstName" autocomplete="given-name" maxlength="60">') +
       this.field('lastName', esc(T('lastName')), '<input class="input" id="' + this.id('lastName') + '" name="lastName" autocomplete="family-name" maxlength="60">') + '</div>' +
       this.field('phone', esc(T('phone')), '<input class="input tnum" id="' + this.id('phone') + '" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="' + esc(T('phonePh')) + '" maxlength="20">') +
-      this.field('email', esc(T('email')), '<input class="input" id="' + this.id('email') + '" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name@email.com" maxlength="100">', esc(T('optional'))) +
+      this.field('email', esc(T('email')), '<input class="input" id="' + this.id('email') + '" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name@email.com" maxlength="100">') +
       '<div class="field grid gap-3" data-field="consentPdpa" style="margin-top:20px">' + this.consentHTML('consentPdpa', T('pdpa')) + '<p class="err" style="margin:-4px 0 0 33px"></p>' + this.consentHTML('consentMarketing', T('marketing')) + '</div>' +
       '<div class="secure">' + ICON.lock + '<span>' + T('secure') + '</span></div>' +
       '<button type="submit" class="btn btn-primary btn-xl" style="margin-top:18px">' + esc(T('submit')) + ' ' + ICON.chev + '</button></form></section>';
@@ -965,7 +966,7 @@ class Cust {
       form.elements.firstName.value = pk(fn); form.elements.lastName.value = pk(ln);
       const p = '08' + Math.floor(Math.random() * 10) + String(Math.floor(1000000 + Math.random() * 8999999));
       form.elements.phone.value = p.slice(0, 3) + '-' + p.slice(3, 6) + '-' + p.slice(6);
-      form.elements.email.value = ''; form.elements.consentPdpa.checked = true;
+      form.elements.email.value = 'guest' + Math.floor(1000 + Math.random() * 90000) + '@example.com'; form.elements.consentPdpa.checked = true;
       $$('.has-error', form).forEach(f => f.classList.remove('has-error'));
     };
     form.addEventListener('input', e => {
@@ -998,7 +999,7 @@ class Cust {
     if (!d.firstName) e.firstName = T('e_firstName');
     if (!d.lastName) e.lastName = T('e_lastName');
     if (!d.phone) e.phone = T('e_phoneReq'); else if (!normalizePhone(d.phone)) e.phone = T('e_phoneBad');
-    if (d.email && !validEmail(d.email)) e.email = T('e_email');
+    if (!d.email) e.email = T('e_emailReq'); else if (!validEmail(d.email)) e.email = T('e_email');
     if (!d.consentPdpa) e.consentPdpa = T('e_pdpa');
     if (Object.keys(e).length) return this.showErrors(form, e);
     const btn = $('button[type=submit]', form); setBusy(btn, true, T('busy'));
@@ -1062,7 +1063,7 @@ const DI18N = {
     daysTitle: 'ยอดลงทะเบียนรายวัน', daysSub: n => 'ทั้ง ' + n + ' วันกิจกรรม', noData: 'ยังไม่มีข้อมูล',
     peakTitle: 'ช่วงพีควันนี้', peakIn: n => 'ลงทะเบียน ' + n + ' คนใน 15 นาที', noToday: 'ยังไม่มีข้อมูลวันนี้',
     mkTitle: 'ยินยอมรับข่าวสาร', mkSub: 'รายชื่อที่ติดต่อชวนสมัครสมาชิกต่อได้', mkOf: (a, b) => a + ' จาก ' + b + ' คน',
-    noteTitle: 'ข้อมูลที่เก็บ', noteSub: 'เท่าที่จำเป็นต่อการติดต่อกลับ', noteList: ['ชื่อ-นามสกุล', 'เบอร์มือถือ', 'อีเมล (ไม่บังคับ)', 'ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา'],
+    noteTitle: 'ข้อมูลที่เก็บ', noteSub: 'เท่าที่จำเป็นต่อการติดต่อกลับ', noteList: ['ชื่อ-นามสกุล', 'เบอร์มือถือ', 'อีเมล', 'ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา'],
     feedTitle: 'ความเคลื่อนไหวล่าสุด', feedSub: 'ไม่แสดงชื่อหรือเบอร์ของลูกค้า', feedNew: 'ลงทะเบียนใหม่', feedEmpty: 'ยังไม่มีรายการ',
     loading: 'กำลังโหลด…', live: t => 'Live  อัปเดต ' + t, liveShort: t => 'Live  ' + t + ' น.', offline: 'เชื่อมต่อไม่ได้ กำลังลองใหม่',
     tabKit: 'QR ลงทะเบียน', tabData: 'ส่งมอบ & ทำลายข้อมูล', simOn: 'จำลองคนลงทะเบียน', simOff: 'หยุดจำลอง', logout: 'ออกจากระบบ',
@@ -1070,10 +1071,10 @@ const DI18N = {
     simToast: 'กำลังจำลองคนลงทะเบียน เวลาเดินเร็วขึ้น 30 เท่า', reset: 'เริ่มข้อมูลใหม่', resetToast: 'รีเซ็ตข้อมูลตัวอย่างแล้ว',
     protoTitle: 'Prototype ระบบลงทะเบียน', openDash: 'เปิด Dashboard เต็มจอ', phoneH: '1. มือถือลูกค้า', phoneSub: 'สแกน QR จุดลงทะเบียน กรอกข้อมูล แสดงหน้าจอกับเจ้าหน้าที่',
     newCust: 'ลูกค้าคนใหม่', newCustToast: 'เริ่มเป็นลูกค้าคนใหม่แล้ว', stepsH: 'ขั้นตอนหน้างาน',
-    steps: ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เบอร์ อีเมล (ไม่บังคับ) ชาวต่างชาติกดปุ่ม EN มุมขวาบนได้', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ไม่แจกซ้ำ'],
+    steps: ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เบอร์ อีเมล ชาวต่างชาติกดปุ่ม EN มุมขวาบนได้', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ไม่แจกซ้ำ'],
     dashH: '2. Live Dashboard ที่แบรนด์เห็น', dashSub: 'ตัวเลขรวมเท่านั้น ไม่มีข้อมูลส่วนบุคคล',
     secH: 'ความปลอดภัยข้อมูล 5 ชั้น', secSub: 'ออกแบบให้ข้อมูลลูกค้าปลอดภัยตั้งแต่กรอกจนทำลาย',
-    sec: [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เบอร์ อีเมล (ไม่บังคับ) และความยินยอม 2 ข้อ ไม่เก็บเลขบัตรหรือข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
+    sec: [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เบอร์ อีเมล และความยินยอม 2 ข้อ ไม่เก็บเลขบัตรหรือข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
       ['เข้ารหัสก่อนบันทึก', 'ข้อมูลส่วนตัวถูกล็อกก่อนเข้าฐานข้อมูล ใครเปิดฐานข้อมูลก็อ่านไม่ออก ระบบใช้บัญชีแยกเฉพาะงานนี้'],
       ['ให้เห็นเท่าที่จำเป็น', 'Dashboard มีแต่ตัวเลขรวม หน้าจอลูกค้าแสดงเบอร์แค่ 4 ตัวท้าย ทุกหน้าของทีมงานต้องใส่ PIN'],
       ['ส่งมอบแบบเข้ารหัส', 'ไฟล์ล็อกด้วยรหัสผ่าน AES-256 ส่งไฟล์กับรหัสคนละช่องทาง มีใบส่งมอบพร้อมรหัสตรวจสอบไฟล์'],
@@ -1099,7 +1100,7 @@ const DI18N = {
     daysTitle: 'Daily registrations', daysSub: n => 'All ' + n + ' event days', noData: 'No data yet',
     peakTitle: "Today's peak", peakIn: n => n + ' registrations in 15 minutes', noToday: 'No data today yet',
     mkTitle: 'Marketing consent', mkSub: 'Contacts available for membership follow-up', mkOf: (a, b) => a + ' of ' + b + ' people',
-    noteTitle: 'Data collected', noteSub: 'Only what is needed to follow up', noteList: ['First and last name', 'Mobile number', 'Email (optional)', 'PDPA and marketing consent, with timestamp'],
+    noteTitle: 'Data collected', noteSub: 'Only what is needed to follow up', noteList: ['First and last name', 'Mobile number', 'Email', 'PDPA and marketing consent, with timestamp'],
     feedTitle: 'Latest activity', feedSub: 'No customer names or numbers shown', feedNew: 'New registration', feedEmpty: 'No activity yet',
     loading: 'Loading…', live: t => 'Live  updated ' + t, liveShort: t => 'Live  ' + t, offline: 'Connection lost, retrying',
     tabKit: 'Registration QR', tabData: 'Handover & deletion', simOn: 'Simulate registrations', simOff: 'Stop simulation', logout: 'Log out',
@@ -1107,10 +1108,10 @@ const DI18N = {
     simToast: 'Simulating registrations, clock running 30× faster', reset: 'Reset data', resetToast: 'Sample data reset',
     protoTitle: 'Registration System Prototype', openDash: 'Open full-screen dashboard', phoneH: '1. Customer phone', phoneSub: 'Scan the QR at the registration point, fill in the form, show the screen to staff',
     newCust: 'New customer', newCustToast: 'Started as a new customer', stepsH: 'On-site steps',
-    steps: ['Staff first invite guests to register in the Axtra Club app. If it works, done.', 'If app registration fails, staff show the QR. The guest enters name, mobile and email (optional). Foreign guests can tap EN at the top right.', 'The screen shows <b>Registration complete</b> with a code and a live clock.', 'Counter staff hand out a <b>paper coupon</b> (the code can be written on it).', 'Registering again with the same phone shows <b>Already registered</b> with the original time. No second coupon.'],
+    steps: ['Staff first invite guests to register in the Axtra Club app. If it works, done.', 'If app registration fails, staff show the QR. The guest enters name, mobile and email. Foreign guests can tap EN at the top right.', 'The screen shows <b>Registration complete</b> with a code and a live clock.', 'Counter staff hand out a <b>paper coupon</b> (the code can be written on it).', 'Registering again with the same phone shows <b>Already registered</b> with the original time. No second coupon.'],
     dashH: '2. Live dashboard for the brand', dashSub: 'Totals only, no personal data',
     secH: '5 layers of data security', secSub: 'Customer data is protected from entry to deletion',
-    sec: [['Collect only what is needed', 'Name, mobile, email (optional) and 2 consents. No ID numbers or anything else. Consent time is recorded as evidence.'],
+    sec: [['Collect only what is needed', 'Name, mobile, email and 2 consents. No ID numbers or anything else. Consent time is recorded as evidence.'],
       ['Encrypt before storage', 'Personal data is locked before it reaches the database, so it is unreadable to anyone who opens it. The system uses a dedicated account for this event.'],
       ['Show only what is needed', 'The dashboard shows totals only. The customer screen shows only the last 4 phone digits. Every staff page requires a PIN.'],
       ['Encrypted handover', 'AES-256 password-locked file. File and password are sent through separate channels, with a handover form and file checksum.'],
