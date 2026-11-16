@@ -429,6 +429,13 @@ select.input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .show2{display:grid;gap:22px;align-items:start;grid-template-columns:minmax(0,1fr)}
 @media (min-width:1080px){.show2{grid-template-columns:400px minmax(0,1fr)}}
 
+/* ---------------- ปุ่มเปลี่ยนภาษา ---------------- */
+.c-lang{position:absolute;z-index:3;right:14px;top:16px;display:flex;gap:2px;padding:3px;border-radius:999px;background:rgba(16,41,79,.28);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.cust.embedded .c-lang{top:46px}
+.c-lang button{min-width:46px;height:32px;padding:0 12px;border-radius:999px;font-size:13.5px;font-weight:600;color:#fff;letter-spacing:.02em;transition:background .15s,color .15s}
+.c-lang button.on{background:#fff;color:var(--secondary)}
+.c-lang button:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -596,7 +603,7 @@ function buildSummary(regs, cfg) {
    DEMO BACKEND — จำลองเซิร์ฟเวอร์ในเบราว์เซอร์ (เปิดไฟล์แล้วเล่นได้ทันที)
    ===================================================================== */
 const Demo = (() => {
-  const KEY = 'axc5_demo_v1';
+  const KEY = 'axc5_demo_v2';
   const PINS = { client: '111111', admin: '999999' };
   const DAY0 = CONFIG.DAYS[0];
   const EVENT0 = Date.parse(DAY0 + 'T10:00:00+07:00');
@@ -610,9 +617,11 @@ const Demo = (() => {
   const pick = (a, w) => { if (!w) return a[Math.floor(rnd() * a.length)]; let x = rnd() * w.reduce((p, q) => p + q, 0); for (let i = 0; i < a.length; i++) { x -= w[i]; if (x <= 0) return a[i]; } return a[a.length - 1]; };
   const laneCodes = () => [];
   const seqCode = n => 'A' + String(n).padStart(4, '0');   // รหัสเรียงลำดับ A0001, A0002, …
+  function fakeThaiId() { let d = String(1 + Math.floor(rnd() * 8)); while (d.length < 12) d += Math.floor(rnd() * 10); let s = 0; for (let i = 0; i < 12; i++) s += Number(d[i]) * (13 - i); return d + ((11 - (s % 11)) % 10); }
   function fakeReg(ms, lane) {
     return { ms, registeredAt: bkkIso(ms), firstName: pick(FN), lastName: pick(LN), phone: '0' + pick(['6', '8', '9']) + String(Math.floor(10000000 + rnd() * 89999999)),
       email: rnd() < 0.6 ? 'guest' + Math.floor(rnd() * 99999) + '@example.com' : '', consentPdpa: true, consentMarketing: rnd() < 0.7,
+      ...(rnd() < 0.9 ? { idType: 'id', idNumber: fakeThaiId() } : { idType: 'passport', idNumber: pick(['AA', 'AB', 'PT', 'K']) + String(Math.floor(1000000 + rnd() * 8999999)) }),
       lane: '', code: '' };
   }
   function seed() {
@@ -667,14 +676,17 @@ const Demo = (() => {
       case 'config': return ok({ eventName: CONFIG.EVENT_NAME, regOpen: !db.destroyed, publicUrl: '', prototype: true });
       case 'register': {
         if (db.destroyed) return fail('CLOSED', 'กิจกรรมนี้จบแล้ว');
-        const r = { firstName: String(p.firstName || '').trim(), lastName: String(p.lastName || '').trim(), phone: normalizePhone(p.phone), email: String(p.email || '').trim().toLowerCase(), consentPdpa: !!p.consentPdpa, consentMarketing: !!p.consentMarketing, lane: String(p.lane || '').toUpperCase() };
+        const idType = p.idType === 'passport' ? 'passport' : 'id';
+        const r = { firstName: String(p.firstName || '').trim(), lastName: String(p.lastName || '').trim(), idType, idNumber: ID.clean(idType, p.idNumber), phone: normalizePhone(p.phone), email: String(p.email || '').trim().toLowerCase(), consentPdpa: !!p.consentPdpa, consentMarketing: !!p.consentMarketing, lang: p.lang === 'en' ? 'EN' : 'TH', lane: String(p.lane || '').toUpperCase() };
         if (!r.firstName) return inv('firstName', 'กรุณากรอกชื่อ');
         if (!r.lastName) return inv('lastName', 'กรุณากรอกนามสกุล');
+        if (!ID.valid(idType, r.idNumber)) return fail('INVALID', 'เลขบัตรประชาชน / Passport ไม่ถูกต้อง', { field: 'idNumber', idType });
         if (!r.phone) return inv('phone', 'เบอร์มือถือไม่ถูกต้อง (เช่น 081-234-5678)');
         if (r.email && !validEmail(r.email)) return inv('email', 'รูปแบบอีเมลไม่ถูกต้อง');
         if (!r.consentPdpa) return inv('consentPdpa', 'กรุณายอมรับนโยบายความเป็นส่วนตัว');
         const ex = db.regs.find(x => x.phone === r.phone);
         if (ex) return ok(regOut(ex), 'เบอร์นี้ลงทะเบียนแล้ว', 'ALREADY_REGISTERED');
+        if (db.regs.some(x => x.idNumber && x.idType === r.idType && x.idNumber === r.idNumber)) return fail('DUPLICATE', 'เลขนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)', { field: 'idNumber', idType });
         if (r.email && db.regs.some(x => x.email === r.email)) return inv('email', 'อีเมลนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)', 'DUPLICATE');
         db.seq = (db.seq || db.regs.length) + 1;
         Object.assign(r, { ms: t, registeredAt: bkkIso(t), code: seqCode(db.seq) });
@@ -694,12 +706,12 @@ const Demo = (() => {
       case 'dashboard': return rl ? ok({ summary: summary(), generatedAt: bkkIso(t), destroyed: db.destroyed }) : fail('AUTH', 'กรุณาใส่ PIN อีกครั้ง');
       case 'vault': {
         if (rl !== 'admin') return fail('AUTH', 'ต้องใช้ PIN ทีมงาน');
-        return ok({ total: db.regs.length, rows: db.regs.slice(-8).reverse().map(r => ({ code: r.code, at: String(r.registeredAt).slice(5, 16).replace('T', ' '), name: cipher('n' + r.firstName + r.lastName), phone: cipher('p' + r.phone), email: r.email ? cipher('e' + r.email) : '–', pdpa: r.consentPdpa, mk: r.consentMarketing })) });
+        return ok({ total: db.regs.length, rows: db.regs.slice(-8).reverse().map(r => ({ code: r.code, at: String(r.registeredAt).slice(5, 16).replace('T', ' '), name: cipher('n' + r.firstName + r.lastName), idn: cipher('i' + (r.idNumber || '')), phone: cipher('p' + r.phone), email: r.email ? cipher('e' + r.email) : '–', pdpa: r.consentPdpa, mk: r.consentMarketing })) });
       }
       case 'export': {
         if (rl !== 'admin') return fail('AUTH', 'ต้องใช้ PIN ทีมงาน');
         const dt = iso => (iso ? String(iso).slice(0, 19).replace('T', ' ') : '');
-        return ok({ rows: db.regs.map(r => ({ code: r.code, registeredAt: dt(r.registeredAt), firstName: r.firstName, lastName: r.lastName, phone: r.phone, email: r.email, consentPdpa: r.consentPdpa, consentMarketing: r.consentMarketing, lane: r.lane })), generatedAt: bkkIso(t) });
+        return ok({ rows: db.regs.map(r => ({ code: r.code, registeredAt: dt(r.registeredAt), firstName: r.firstName, lastName: r.lastName, idType: r.idType === 'passport' ? 'Passport' : 'บัตรประชาชน', idNumber: r.idNumber || '', phone: r.phone, email: r.email, consentPdpa: r.consentPdpa, consentMarketing: r.consentMarketing, lang: r.lang || 'TH', lane: r.lane })), generatedAt: bkkIso(t) });
       }
       case 'destroy': {
         if (rl !== 'admin') return fail('AUTH', 'ต้องใช้ PIN ทีมงาน');
@@ -761,48 +773,159 @@ const State = {
   url(params) { const q = Object.keys(params).filter(k => params[k]).map(k => k + '=' + encodeURIComponent(params[k])).join('&'); return this.base() + (q ? '?' + q : ''); }
 };
 
+/* ---------- ภาษา ไทย / English (หน้าลูกค้า) ---------- */
+const LANG_KEY = 'axc5_lang';
+const MON = { th: ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'], en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] };
+const THAI_MON = MON.th;
+const I18N = {
+  th: {
+    title: 'ลงทะเบียนร่วมกิจกรรม',
+    formH: 'กรอกข้อมูลลงทะเบียน', formLead: 'กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอ "ลงทะเบียนสำเร็จ" กับเจ้าหน้าที่',
+    closed: 'กิจกรรมนี้ปิดรับลงทะเบียนแล้ว',
+    firstName: 'ชื่อ', lastName: 'นามสกุล',
+    idType: 'เอกสารยืนยันตัวตน', idCard: 'บัตรประชาชน', passport: 'Passport',
+    idCardNo: 'เลขบัตรประชาชน 13 หลัก', passportNo: 'เลข Passport', idCardPh: 'x-xxxx-xxxxx-xx-x', passportPh: 'เช่น AA1234567',
+    phone: 'เบอร์มือถือ', phonePh: '08x-xxx-xxxx', email: 'อีเมล', optional: 'ไม่บังคับ',
+    pdpa: 'ข้าพเจ้าได้อ่านและรับทราบ {privacy} และยินยอมให้เก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อการลงทะเบียนร่วมกิจกรรม',
+    privacy: 'นโยบายความเป็นส่วนตัว',
+    marketing: 'ยินยอมให้ AXTRA Club ติดต่อเพื่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ ทางโทรศัพท์ SMS และอีเมล (ไม่บังคับ)',
+    secure: '<b>ข้อมูลของคุณปลอดภัย</b> ส่งผ่านการเชื่อมต่อที่เข้ารหัส เลขบัตรและข้อมูลส่วนตัวถูกเข้ารหัสก่อนบันทึก ใช้เฉพาะกิจกรรมนี้ และจะถูกลบจากระบบนี้หลังจบกิจกรรม',
+    submit: 'ลงทะเบียน', busy: 'กำลังลงทะเบียน…',
+    e_firstName: 'กรุณากรอกชื่อ', e_lastName: 'กรุณากรอกนามสกุล',
+    e_idReq_id: 'กรุณากรอกเลขบัตรประชาชน', e_idBad_id: 'เลขบัตรประชาชนไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง',
+    e_idReq_passport: 'กรุณากรอกเลข Passport', e_idBad_passport: 'เลข Passport ไม่ถูกต้อง (ตัวอักษรภาษาอังกฤษและตัวเลข 6–15 ตัว)',
+    e_idDup: 'เลขนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)',
+    e_phoneReq: 'กรุณากรอกเบอร์มือถือ', e_phoneBad: 'เบอร์มือถือไม่ถูกต้อง ใส่ 10 หลัก เช่น 081-234-5678',
+    e_email: 'รูปแบบอีเมลไม่ถูกต้อง', e_emailDup: 'อีเมลนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)',
+    e_pdpa: 'กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนลงทะเบียน',
+    e_fail: 'ไม่สำเร็จ กรุณาลองอีกครั้ง', e_net: 'เชื่อมต่อไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วกดอีกครั้ง',
+    okH: 'ลงทะเบียนสำเร็จ', okLead: 'แสดงหน้าจอนี้กับเจ้าหน้าที่ เพื่อรับคูปองที่เคาน์เตอร์ลงทะเบียน',
+    dupH: 'คุณลงทะเบียนแล้ว', dupPhone: 'เบอร์นี้ลงทะเบียนไว้แล้ว ', dupLead: 'สิทธิ์ 1 ท่านต่อ 1 ครั้ง ตลอดกิจกรรม',
+    code: 'รหัสลงทะเบียน', who: (f, l, p4) => 'คุณ' + f + ' ' + l + '. · เบอร์ลงท้าย ' + p4,
+    regAt: 'ลงทะเบียนเมื่อ', now: 'เวลาขณะนี้',
+    when: (y, m, d, hm) => d + ' ' + MON.th[m - 1] + ' ' + (y + 543) + ' เวลา ' + hm + ' น.',
+    clockNote: 'นาฬิกาเดินตลอด ใช้ยืนยันว่าเป็นหน้าจอจริง ไม่ใช่ภาพแคป',
+    hidden: 'หน้านี้ไม่แสดงเลขบัตร เบอร์เต็ม และอีเมลของคุณ',
+    next: 'ลงทะเบียนให้ท่านถัดไป (ใช้เครื่องเดียวกัน)',
+    demoFill: 'ใช้ข้อมูลตัวอย่าง (เฉพาะ Prototype)', demoH: 'ลองต่อ (เฉพาะ Prototype)', demoAgain: 'ลองลงทะเบียนซ้ำด้วยเบอร์เดิม',
+    demoDash: 'ดู Dashboard แบบเรียลไทม์ (PIN 111111)', demoToast: 'กรอกเบอร์เดิมอีกครั้ง เพื่อดูหน้าที่ขึ้นเมื่อลงทะเบียนซ้ำ',
+    pvSub: 'สำหรับการลงทะเบียนร่วมกิจกรรม AXTRA Club', pvOk: 'รับทราบ',
+    pv: [
+      ['1. ข้อมูลที่เราเก็บ', '<p>ชื่อ-นามสกุล เลขบัตรประจำตัวประชาชนหรือเลขหนังสือเดินทาง (Passport) เบอร์โทรศัพท์มือถือ อีเมล (ถ้ามี) และการให้ความยินยอมของท่าน พร้อมวันเวลาที่ลงทะเบียน</p>'],
+      ['2. วัตถุประสงค์', '<ul><li>เพื่อลงทะเบียนร่วมกิจกรรม ยืนยันตัวตน และตรวจสอบสิทธิ์ของท่าน (1 ท่านต่อ 1 สิทธิ์)</li><li>เพื่อติดต่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ เฉพาะกรณีที่ท่านให้ความยินยอม</li></ul>'],
+      ['3. การเปิดเผยข้อมูล', '<p>ข้อมูลของท่านจะใช้โดย AXTRA Club และผู้ให้บริการระบบที่ได้รับมอบหมายเท่านั้น ซึ่งประมวลผลตามคำสั่งและไม่นำไปใช้เพื่อวัตถุประสงค์อื่น</p>'],
+      ['4. ระยะเวลาการเก็บรักษา', '<p>ระบบลงทะเบียนนี้เก็บข้อมูลจนจบกิจกรรมและส่งมอบให้ AXTRA Club แล้วจึงลบข้อมูลออกจากระบบนี้ทั้งหมด AXTRA Club จะเก็บรักษาข้อมูลเท่าที่จำเป็นตามวัตถุประสงค์ข้างต้น</p>'],
+      ['5. การรักษาความปลอดภัย', '<p>ข้อมูลถูกส่งผ่านการเชื่อมต่อที่เข้ารหัส เลขบัตรและข้อมูลส่วนบุคคลถูกเข้ารหัสก่อนจัดเก็บ ไม่แสดงบนหน้าจอใด ๆ และจำกัดการเข้าถึงเฉพาะผู้ที่ได้รับอนุญาต</p>'],
+      ['6. สิทธิของท่าน', '<p>ท่านมีสิทธิขอเข้าถึง แก้ไข ลบ ระงับ หรือคัดค้านการใช้ข้อมูล และถอนความยินยอมได้ตลอดเวลา รวมถึงร้องเรียนต่อสำนักงานคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล</p>'],
+      ['7. ติดต่อเรา', '<p>AXTRA Club ผ่านช่องทางติดต่อที่ระบุในแอปพลิเคชันหรือเว็บไซต์ทางการ</p>']
+    ]
+  },
+  en: {
+    title: 'Event Registration',
+    formH: 'Your details', formLead: 'Takes less than a minute. Then show the "Registration complete" screen to our staff.',
+    closed: 'Registration for this event is closed.',
+    firstName: 'First name', lastName: 'Last name',
+    idType: 'ID document', idCard: 'Thai ID card', passport: 'Passport',
+    idCardNo: '13-digit Thai ID number', passportNo: 'Passport number', idCardPh: 'x-xxxx-xxxxx-xx-x', passportPh: 'e.g. AA1234567',
+    phone: 'Mobile number', phonePh: '08x-xxx-xxxx or +country code', email: 'Email', optional: 'optional',
+    pdpa: 'I have read and acknowledge the {privacy} and consent to the collection and use of my personal data for this event registration.',
+    privacy: 'Privacy Policy',
+    marketing: 'I agree that AXTRA Club may contact me about membership, news, promotions and special offers by phone, SMS and email (optional).',
+    secure: '<b>Your data is safe.</b> Sent over an encrypted connection. Your ID number and personal details are encrypted before storage, used only for this event, and deleted from this system after the event.',
+    submit: 'Register', busy: 'Registering…',
+    e_firstName: 'Please enter your first name.', e_lastName: 'Please enter your last name.',
+    e_idReq_id: 'Please enter your Thai ID number.', e_idBad_id: 'This Thai ID number is not valid. Please check it again.',
+    e_idReq_passport: 'Please enter your passport number.', e_idBad_passport: 'Invalid passport number (6–15 letters and digits).',
+    e_idDup: 'This number is already registered (one registration per person).',
+    e_phoneReq: 'Please enter your mobile number.', e_phoneBad: 'Invalid mobile number. Use 10 digits, e.g. 081-234-5678, or add your country code, e.g. +65…',
+    e_email: 'Invalid email format.', e_emailDup: 'This email is already registered (one registration per person).',
+    e_pdpa: 'Please accept the Privacy Policy to register.',
+    e_fail: 'Something went wrong. Please try again.', e_net: 'No connection. Check your internet and try again.',
+    okH: 'Registration complete', okLead: 'Show this screen to our staff to receive your coupon at the registration counter.',
+    dupH: "You're already registered", dupPhone: 'This mobile number is already registered. ', dupLead: 'One registration per person for the whole event.',
+    code: 'Registration code', who: (f, l, p4) => f + ' ' + l + '. · phone ending ' + p4,
+    regAt: 'Registered on', now: 'Time now',
+    when: (y, m, d, hm) => d + ' ' + MON.en[m - 1] + ' ' + y + ', ' + hm,
+    clockNote: 'The clock keeps running to show this is a live screen, not a screenshot.',
+    hidden: 'Your ID number, full phone number and email are not shown on this page.',
+    next: 'Register the next person (same device)',
+    demoFill: 'Fill sample data (prototype only)', demoH: 'Try more (prototype only)', demoAgain: 'Register again with the same phone number',
+    demoDash: 'View the live dashboard (PIN 111111)', demoToast: 'Enter the same phone number again to see the duplicate screen.',
+    pvSub: 'For AXTRA Club event registration', pvOk: 'Got it',
+    pv: [
+      ['1. Information we collect', '<p>Your first and last name, Thai ID number or passport number, mobile number, email (if provided), your consent choices, and the date and time of registration.</p>'],
+      ['2. Purposes', '<ul><li>To register you for the event, verify your identity and confirm your entitlement (one per person).</li><li>To contact you about membership, news, promotions and special offers, only if you have given consent.</li></ul>'],
+      ['3. Disclosure', '<p>Your data is used only by AXTRA Club and its appointed system service provider, which processes it on AXTRA Club\'s instructions and for no other purpose.</p>'],
+      ['4. Retention', '<p>This registration system keeps your data until the event ends and it has been handed over to AXTRA Club, after which it is deleted from this system entirely. AXTRA Club keeps it only as long as necessary for the purposes above.</p>'],
+      ['5. Security', '<p>Data is sent over an encrypted connection. Your ID number and personal data are encrypted before storage, never shown on any screen, and accessible only to authorized persons.</p>'],
+      ['6. Your rights', '<p>You may request access to, correction, deletion or restriction of your data, object to its use, and withdraw consent at any time. You may also lodge a complaint with the Office of the Personal Data Protection Committee of Thailand.</p>'],
+      ['7. Contact us', '<p>Contact AXTRA Club through the channels listed in its official app or website.</p>']
+    ]
+  }
+};
+const Lang = {
+  get() { const q = new URLSearchParams(location.search).get('lang'); if (q === 'en' || q === 'th') return q; const v = store.get(LANG_KEY, 'th'); return v === 'en' ? 'en' : 'th'; },
+  set(l) { store.set(LANG_KEY, l); document.documentElement.lang = l; }
+};
+const tr = (k, l) => { const L = I18N[l || Lang.get()]; return L[k] != null ? L[k] : I18N.th[k]; };
+
+/* ---------- เลขบัตรประชาชน / Passport ---------- */
+const ID = {
+  clean(type, v) { const s = String(v == null ? '' : v); return type === 'passport' ? s.toUpperCase().replace(/[^A-Z0-9]/g, '') : s.replace(/\D/g, ''); },
+  validThai(d) { if (!/^\d{13}$/.test(d)) return false; let s = 0; for (let i = 0; i < 12; i++) s += Number(d[i]) * (13 - i); return (11 - (s % 11)) % 10 === Number(d[12]); },
+  valid(type, v) { const c = this.clean(type, v); return type === 'passport' ? /^[A-Z0-9]{6,15}$/.test(c) && /\d/.test(c) : this.validThai(c); },
+  fmtThai(d) { const g = [1, 4, 5, 2, 1], out = []; let i = 0; for (const n of g) { if (i >= d.length) break; out.push(d.slice(i, i + n)); i += n; } return out.join('-'); },
+  sample() { let d = String(1 + Math.floor(Math.random() * 8)); while (d.length < 12) d += Math.floor(Math.random() * 10); let s = 0; for (let i = 0; i < 12; i++) s += Number(d[i]) * (13 - i); return d + ((11 - (s % 11)) % 10); }
+};
+
 /* ---------- นโยบายความเป็นส่วนตัว (ข้อความมาตรฐานทั่วไป) ---------- */
 const Privacy = {
-  open() {
-    Modal.open('<div class="pv"><h2 class="text-xl font-semibold">นโยบายความเป็นส่วนตัว</h2><p class="mt-1 text-[13px] muted">สำหรับการลงทะเบียนร่วมกิจกรรม AXTRA Club</p>' +
-      '<h3>1. ข้อมูลที่เราเก็บ</h3><p>ชื่อ-นามสกุล เบอร์โทรศัพท์มือถือ อีเมล (ถ้ามี) และการให้ความยินยอมของท่าน พร้อมวันเวลาที่ลงทะเบียน</p>' +
-      '<h3>2. วัตถุประสงค์</h3><ul><li>เพื่อลงทะเบียนร่วมกิจกรรมและยืนยันสิทธิ์ของท่าน (1 ท่านต่อ 1 สิทธิ์)</li><li>เพื่อติดต่อแนะนำการสมัครสมาชิก ข่าวสาร โปรโมชัน และสิทธิพิเศษ เฉพาะกรณีที่ท่านให้ความยินยอม</li></ul>' +
-      '<h3>3. การเปิดเผยข้อมูล</h3><p>ข้อมูลของท่านจะใช้โดย AXTRA Club และผู้ให้บริการระบบที่ได้รับมอบหมายเท่านั้น ซึ่งประมวลผลตามคำสั่งและไม่นำไปใช้เพื่อวัตถุประสงค์อื่น</p>' +
-      '<h3>4. ระยะเวลาการเก็บรักษา</h3><p>ระบบลงทะเบียนนี้เก็บข้อมูลจนจบกิจกรรมและส่งมอบให้ AXTRA Club แล้วจึงลบข้อมูลออกจากระบบนี้ทั้งหมด AXTRA Club จะเก็บรักษาข้อมูลเท่าที่จำเป็นตามวัตถุประสงค์ข้างต้น</p>' +
-      '<h3>5. การรักษาความปลอดภัย</h3><p>ข้อมูลถูกส่งผ่านการเชื่อมต่อที่เข้ารหัส และจำกัดการเข้าถึงเฉพาะผู้ที่ได้รับอนุญาต</p>' +
-      '<h3>6. สิทธิของท่าน</h3><p>ท่านมีสิทธิขอเข้าถึง แก้ไข ลบ ระงับ หรือคัดค้านการใช้ข้อมูล และถอนความยินยอมได้ตลอดเวลา รวมถึงร้องเรียนต่อสำนักงานคณะกรรมการคุ้มครองข้อมูลส่วนบุคคล</p>' +
-      '<h3>7. ติดต่อเรา</h3><p>AXTRA Club ผ่านช่องทางติดต่อที่ระบุในแอปพลิเคชันหรือเว็บไซต์ทางการ</p>' +
-      '<button type="button" class="btn btn-primary w-full mt-5" data-close>รับทราบ</button></div>', 480);
+  open(l) {
+    const L = I18N[l || Lang.get()];
+    Modal.open('<div class="pv" lang="' + (l || Lang.get()) + '"><h2 class="text-xl font-semibold">' + L.privacy + '</h2><p class="mt-1 text-[13px] muted">' + L.pvSub + '</p>' +
+      L.pv.map(x => '<h3>' + x[0] + '</h3>' + x[1]).join('') +
+      '<button type="button" class="btn btn-primary w-full mt-5" data-close>' + L.pvOk + '</button></div>', 480);
   }
 };
 
 /* =====================================================================
    CUSTOMER APP — ลงทะเบียน (ใช้ทั้งหน้าจริงและใน Prototype)
    ===================================================================== */
-const ME_KEY = 'axc5_me';
+const ME_KEY = 'axc5_me2';
 class Cust {
   constructor(root, opts) {
     this.root = root;
     this.o = Object.assign({ lane: '', embedded: false }, opts);
+    this.lang = Lang.get(); document.documentElement.lang = this.lang;
     root.innerHTML = '<div class="cust' + (this.o.embedded ? ' embedded' : '') + '"><header class="c-head" data-head></header><main class="c-body" data-body></main><footer class="c-foot">' + esc(State.config.eventName) + '</footer><div class="c-toasts" data-toasts aria-live="polite"></div></div>';
     this.el = $('.cust', root); this.head = $('[data-head]', root); this.body = $('[data-body]', root); this.toasts = $('[data-toasts]', root);
     this.start();
   }
+  t(k) { return tr(k, this.lang); }
   get me() { return store.get(ME_KEY, {}) || {}; }
   setMe(patch) { store.set(ME_KEY, Object.assign(this.me, patch)); }
   toast(m, t) { toast(m, t, this.toasts); }
   top() { if (this.o.embedded) this.el.scrollTop = 0; else window.scrollTo(0, 0); }
   start(opts = {}) { Object.assign(this.o, opts); const me = this.me; if (me.reg) { this.done(me.reg, false); this.verify(me.reg); } else this.register(); }
-  laneLabel() { const m = String(this.o.lane || '').match(/(\d+)$/); return m ? Number(m[1]) : ''; }
   header() {
-    this.head.innerHTML = '<div class="c-smile">' + ICON.smile + '</div><img class="logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club">' +
-      '<h1 class="c-title sm">' + esc(CONFIG.HERO_TITLE) + '</h1>' + (CONFIG.EVENT_DATE_TEXT ? '<p class="c-sub">' + esc(CONFIG.EVENT_DATE_TEXT) + '</p>' : '');
+    this.head.innerHTML = '<div class="c-smile">' + ICON.smile + '</div>' +
+      '<div class="c-lang" role="group" aria-label="Language / ภาษา">' + [['th', 'ไทย'], ['en', 'EN']].map(x => '<button type="button" data-lang="' + x[0] + '" aria-pressed="' + (this.lang === x[0]) + '"' + (this.lang === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>').join('') + '</div>' +
+      '<img class="logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club">' +
+      '<h1 class="c-title sm">' + esc(this.t('title')) + '</h1>' + (CONFIG.EVENT_DATE_TEXT ? '<p class="c-sub">' + esc(CONFIG.EVENT_DATE_TEXT) + '</p>' : '');
+    $$('[data-lang]', this.head).forEach(b => b.onclick = () => this.switchLang(b.dataset.lang));
+  }
+  switchLang(l) {
+    if (l === this.lang) return;
+    const keep = this.view === 'form' ? this.values() : null;
+    this.lang = l; Lang.set(l);
+    if (this.view === 'done') this.done(this.lastReg, this.lastHow, true);
+    else this.register(keep, true);
   }
   consentHTML(name, text) {
-    return '<label class="check"><input type="checkbox" name="' + name + '"><span class="check-box">' + ICON.check + '</span><span>' + esc(text).replace('{privacy}', '<button type="button" class="btn-link" data-privacy>' + esc(CONFIG.PRIVACY_TEXT) + '</button>') + (name === 'consentPdpa' ? ' <span class="req">*</span>' : '') + '</span></label>';
+    return '<label class="check"><input type="checkbox" name="' + name + '"><span class="check-box">' + ICON.check + '</span><span>' + esc(text).replace('{privacy}', '<button type="button" class="btn-link" data-privacy>' + esc(this.t('privacy')) + '</button>') + (name === 'consentPdpa' ? ' <span class="req">*</span>' : '') + '</span></label>';
   }
   field(name, label, inner, opt) {
-    return '<div class="field" data-field="' + name + '"><label class="field-label" for="' + this.id(name) + '">' + label + (opt ? ' <span class="opt">' + opt + '</span>' : ' <span class="req">*</span>') + '</label>' + inner + '<p class="err"></p></div>';
+    return '<div class="field" data-field="' + name + '"><label class="field-label" for="' + this.id(name) + '"' + (name === 'idNumber' ? ' data-idlabel' : '') + '>' + label + (opt ? ' <span class="opt">' + opt + '</span>' : ' <span class="req">*</span>') + '</label>' + inner + '<p class="err"></p></div>';
   }
   id(n) { if (!this._uid) this._uid = 'c' + Math.random().toString(36).slice(2, 7); return this._uid + '-' + n; }
   showErrors(form, errs) {
@@ -811,78 +934,139 @@ class Cust {
     if (first) {
       if (this.o.embedded) this.el.scrollBy({ top: first.getBoundingClientRect().top - this.el.getBoundingClientRect().top - 140, behavior: 'smooth' });
       else first.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const inp = $('input:not([type=checkbox])', first); if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 300);
+      const inp = $('input:not([type=checkbox]):not([type=radio])', first); if (inp) setTimeout(() => inp.focus({ preventScroll: true }), 300);
     } else this.toast(Object.values(errs)[0], 'err');
+  }
+  values() {
+    const form = $('form', this.body); if (!form) return null;
+    const fd = new FormData(form);
+    return { firstName: fd.get('firstName') || '', lastName: fd.get('lastName') || '', idType: fd.get('idType') || 'id', idNumber: fd.get('idNumber') || '', phone: fd.get('phone') || '', email: fd.get('email') || '', consentPdpa: !!fd.get('consentPdpa'), consentMarketing: !!fd.get('consentMarketing'), touched: this.idTouched };
+  }
+  idType(form) { const r = $('input[name=idType]:checked', form); return r ? r.value : 'id'; }
+  applyIdType(form, keepValue) {
+    const type = this.idType(form), inp = $('input[name=idNumber]', form), lab = $('[data-idlabel]', form);
+    lab.innerHTML = esc(this.t(type === 'passport' ? 'passportNo' : 'idCardNo')) + ' <span class="req">*</span>';
+    inp.placeholder = this.t(type === 'passport' ? 'passportPh' : 'idCardPh');
+    inp.inputMode = type === 'passport' ? 'text' : 'numeric';
+    inp.maxLength = type === 'passport' ? 15 : 17;
+    inp.autocapitalize = type === 'passport' ? 'characters' : 'off';
+    if (!keepValue) inp.value = '';
+    else inp.value = type === 'passport' ? ID.clean('passport', inp.value) : ID.fmtThai(ID.clean('id', inp.value).slice(0, 13));
+    const f = inp.closest('.field'); f.classList.remove('has-error');
   }
 
   /* ---------- 1) ลงทะเบียน ---------- */
-  register() {
+  register(keep, quiet) {
     clearInterval(this.clockT);
-    this.header(); this.top();
-    const open = State.config.regOpen;
-    this.body.innerHTML = '<section class="sheet"><h2>กรอกข้อมูลลงทะเบียน</h2><p class="lead">กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอ "ลงทะเบียนสำเร็จ" กับเจ้าหน้าที่</p>' +
-      (open ? '' : '<div class="found" style="background:var(--warning-soft);color:var(--warning)">กิจกรรมนี้ปิดรับลงทะเบียนแล้ว</div>') +
+    this.view = 'form';
+    this.header(); if (!quiet) this.top();
+    const open = State.config.regOpen, T = k => this.t(k);
+    this.idTouched = !!(keep && keep.touched);
+    const idType = keep && keep.idType && (keep.touched || keep.idNumber) ? keep.idType : (this.lang === 'en' ? 'passport' : 'id');
+    this.body.innerHTML = '<section class="sheet"><h2>' + esc(T('formH')) + '</h2><p class="lead">' + esc(T('formLead')) + '</p>' +
+      (open ? '' : '<div class="found" style="background:var(--warning-soft);color:var(--warning)">' + esc(T('closed')) + '</div>') +
+      (open && State.config.prototype ? '<button type="button" class="btn btn-ghost btn-sm w-full mt-3" data-sample>' + esc(T('demoFill')) + '</button>' : '') +
       '<form novalidate' + (open ? '' : ' hidden') + '><input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
       '<div class="grid grid-cols-2 gap-3">' +
-      this.field('firstName', 'ชื่อ', '<input class="input" id="' + this.id('firstName') + '" name="firstName" autocomplete="given-name" maxlength="60">') +
-      this.field('lastName', 'นามสกุล', '<input class="input" id="' + this.id('lastName') + '" name="lastName" autocomplete="family-name" maxlength="60">') + '</div>' +
-      this.field('phone', 'เบอร์มือถือ', '<input class="input tnum" id="' + this.id('phone') + '" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08x-xxx-xxxx" maxlength="20">') +
-      this.field('email', 'อีเมล', '<input class="input" id="' + this.id('email') + '" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name@email.com" maxlength="100">', 'ไม่บังคับ') +
-      '<div class="field grid gap-3" data-field="consentPdpa" style="margin-top:20px">' + this.consentHTML('consentPdpa', CONFIG.PDPA_TEXT) + '<p class="err" style="margin:-4px 0 0 33px"></p>' + this.consentHTML('consentMarketing', CONFIG.MARKETING_TEXT) + '</div>' +
-      '<div class="secure">' + ICON.lock + '<span><b>ข้อมูลของคุณปลอดภัย</b> ส่งผ่านการเชื่อมต่อที่เข้ารหัส ใช้เฉพาะกิจกรรมนี้ และจะถูกลบจากระบบนี้หลังจบกิจกรรม</span></div>' +
-      '<button type="submit" class="btn btn-primary btn-xl" style="margin-top:18px">ลงทะเบียน ' + ICON.chev + '</button></form></section>';
+      this.field('firstName', esc(T('firstName')), '<input class="input" id="' + this.id('firstName') + '" name="firstName" autocomplete="given-name" maxlength="60">') +
+      this.field('lastName', esc(T('lastName')), '<input class="input" id="' + this.id('lastName') + '" name="lastName" autocomplete="family-name" maxlength="60">') + '</div>' +
+      '<div class="field" data-field="idType"><span class="field-label">' + esc(T('idType')) + ' <span class="req">*</span></span><div class="seg" role="radiogroup">' +
+      [['id', T('idCard')], ['passport', T('passport')]].map(x => '<label><input type="radio" name="idType" value="' + x[0] + '"' + (idType === x[0] ? ' checked' : '') + '><span>' + esc(x[1]) + '</span></label>').join('') + '</div></div>' +
+      this.field('idNumber', '', '<input class="input tnum" id="' + this.id('idNumber') + '" name="idNumber" autocomplete="off" autocorrect="off" spellcheck="false">') +
+      this.field('phone', esc(T('phone')), '<input class="input tnum" id="' + this.id('phone') + '" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="' + esc(T('phonePh')) + '" maxlength="20">') +
+      this.field('email', esc(T('email')), '<input class="input" id="' + this.id('email') + '" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name@email.com" maxlength="100">', esc(T('optional'))) +
+      '<div class="field grid gap-3" data-field="consentPdpa" style="margin-top:20px">' + this.consentHTML('consentPdpa', T('pdpa')) + '<p class="err" style="margin:-4px 0 0 33px"></p>' + this.consentHTML('consentMarketing', T('marketing')) + '</div>' +
+      '<div class="secure">' + ICON.lock + '<span>' + T('secure') + '</span></div>' +
+      '<button type="submit" class="btn btn-primary btn-xl" style="margin-top:18px">' + esc(T('submit')) + ' ' + ICON.chev + '</button></form></section>';
     const form = $('form', this.body);
-    $$('[data-privacy]', form).forEach(b => b.onclick = e => { e.preventDefault(); Privacy.open(); });
+    if (keep) {
+      ['firstName', 'lastName', 'idNumber', 'phone', 'email'].forEach(k => { form.elements[k].value = keep[k] || ''; });
+      form.elements.consentPdpa.checked = !!keep.consentPdpa; form.elements.consentMarketing.checked = !!keep.consentMarketing;
+    }
+    this.applyIdType(form, true);
+    $$('[data-privacy]', form).forEach(b => b.onclick = e => { e.preventDefault(); Privacy.open(this.lang); });
+    const smp = $('[data-sample]', this.body);
+    if (smp) smp.onclick = () => {
+      const fn = this.lang === 'en' ? ['Daniel', 'Emily', 'James', 'Sophie'] : ['สมชาย', 'สุดารัตน์', 'ณัฐพล', 'พิมพ์ชนก'], ln = this.lang === 'en' ? ['Smith', 'Brown', 'Wilson', 'Taylor'] : ['ใจดี', 'ศรีสุข', 'วงศ์สวัสดิ์', 'แก้วมณี'];
+      const pk = a => a[Math.floor(Math.random() * a.length)], type = this.idType(form);
+      form.elements.firstName.value = pk(fn); form.elements.lastName.value = pk(ln);
+      form.elements.idNumber.value = type === 'passport' ? pk(['AA', 'AB', 'PT', 'K']) + String(Math.floor(1000000 + Math.random() * 8999999)) : ID.fmtThai(ID.sample());
+      const p = '08' + Math.floor(Math.random() * 10) + String(Math.floor(1000000 + Math.random() * 8999999));
+      form.elements.phone.value = p.slice(0, 3) + '-' + p.slice(3, 6) + '-' + p.slice(6);
+      form.elements.email.value = ''; form.elements.consentPdpa.checked = true;
+      $$('.has-error', form).forEach(f => f.classList.remove('has-error'));
+    };
     form.addEventListener('input', e => {
       const f = e.target.closest('.field'); if (f) f.classList.remove('has-error');
-      if (e.target.name === 'phone') {
-        const el = e.target, raw = el.value; let d = raw.replace(/\D/g, '');
+      const el = e.target, raw = el.value;
+      if (el.name === 'phone') {
+        let d = raw.replace(/\D/g, '');
         if (/^66[689]\d{8}/.test(d)) d = '0' + d.slice(2);
         if (d.charAt(0) === '0') { d = d.slice(0, 10); const v = d.length > 6 ? d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6) : d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; if (v !== raw) el.value = v; }
       }
+      if (el.name === 'idNumber') {
+        const type = this.idType(form);
+        const v = type === 'passport' ? ID.clean('passport', raw).slice(0, 15) : ID.fmtThai(ID.clean('id', raw).slice(0, 13));
+        if (v !== raw) el.value = v;
+      }
     });
-    form.addEventListener('change', e => { const f = e.target.closest('.field'); if (f) f.classList.remove('has-error'); });
+    form.addEventListener('change', e => {
+      const f = e.target.closest('.field'); if (f) f.classList.remove('has-error');
+      if (e.target.name === 'idType') { this.idTouched = true; this.applyIdType(form, false); setTimeout(() => form.elements.idNumber.focus({ preventScroll: true }), 50); }
+    });
     form.addEventListener('submit', e => { e.preventDefault(); this.submit(form); });
   }
+  srvMsg(r) {
+    const f = r.data && r.data.field, c = r.code;
+    if (c === 'CLOSED') return { toast: this.t('closed') };
+    if (!f) return { toast: this.t('e_fail') };
+    const m = { firstName: 'e_firstName', lastName: 'e_lastName', phone: 'e_phoneBad', consentPdpa: 'e_pdpa',
+      email: c === 'DUPLICATE' ? 'e_emailDup' : 'e_email',
+      idNumber: c === 'DUPLICATE' ? 'e_idDup' : 'e_idBad_' + (r.data.idType === 'passport' ? 'passport' : 'id') }[f];
+    return { field: f, msg: m ? this.t(m) : (r.message || this.t('e_fail')) };
+  }
   async submit(form) {
-    const fd = new FormData(form);
-    const d = { firstName: fd.get('firstName').trim(), lastName: fd.get('lastName').trim(), phone: fd.get('phone').trim(), email: fd.get('email').trim(), consentPdpa: !!fd.get('consentPdpa'), consentMarketing: !!fd.get('consentMarketing'), lane: this.o.lane, website: fd.get('website') };
-    const e = {};
-    if (!d.firstName) e.firstName = 'กรุณากรอกชื่อ';
-    if (!d.lastName) e.lastName = 'กรุณากรอกนามสกุล';
-    if (!d.phone) e.phone = 'กรุณากรอกเบอร์มือถือ'; else if (!normalizePhone(d.phone)) e.phone = 'เบอร์มือถือไม่ถูกต้อง ใส่ 10 หลัก เช่น 081-234-5678';
-    if (d.email && !validEmail(d.email)) e.email = 'รูปแบบอีเมลไม่ถูกต้อง';
-    if (!d.consentPdpa) e.consentPdpa = 'กรุณายอมรับนโยบายความเป็นส่วนตัวก่อนลงทะเบียน';
+    const fd = new FormData(form), type = this.idType(form);
+    const d = { firstName: fd.get('firstName').trim(), lastName: fd.get('lastName').trim(), idType: type, idNumber: ID.clean(type, fd.get('idNumber')), phone: fd.get('phone').trim(), email: fd.get('email').trim(), consentPdpa: !!fd.get('consentPdpa'), consentMarketing: !!fd.get('consentMarketing'), lang: this.lang, lane: this.o.lane, website: fd.get('website') };
+    const e = {}, T = k => this.t(k);
+    if (!d.firstName) e.firstName = T('e_firstName');
+    if (!d.lastName) e.lastName = T('e_lastName');
+    if (!d.idNumber) e.idNumber = T('e_idReq_' + type); else if (!ID.valid(type, d.idNumber)) e.idNumber = T('e_idBad_' + type);
+    if (!d.phone) e.phone = T('e_phoneReq'); else if (!normalizePhone(d.phone)) e.phone = T('e_phoneBad');
+    if (d.email && !validEmail(d.email)) e.email = T('e_email');
+    if (!d.consentPdpa) e.consentPdpa = T('e_pdpa');
     if (Object.keys(e).length) return this.showErrors(form, e);
-    const btn = $('button[type=submit]', form); setBusy(btn, true, 'กำลังลงทะเบียน…');
+    const btn = $('button[type=submit]', form); setBusy(btn, true, T('busy'));
     try {
       const r = await Backend.call('register', { data: d });
-      if (!r.success) { if (r.data && r.data.field) return this.showErrors(form, { [r.data.field]: r.message }); return this.toast(r.message || 'ไม่สำเร็จ กรุณาลองอีกครั้ง', 'err'); }
+      if (!r.success) { const s = this.srvMsg(r); if (s.field) return this.showErrors(form, { [s.field]: s.msg }); return this.toast(s.toast, 'err'); }
       this.setMe({ reg: r.data });
       this.done(r.data, r.code === 'ALREADY_REGISTERED' ? 'dup' : 'new');
-    } catch (err) { this.toast('เชื่อมต่อไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วกดอีกครั้ง', 'err'); }
+    } catch (err) { this.toast(T('e_net'), 'err'); }
     finally { setBusy(btn, false); }
   }
 
   /* ---------- 2) ผลการลงทะเบียน ---------- */
-  done(reg, how) {
-    this.header(); this.top();
+  done(reg, how, quiet) {
+    this.view = 'done'; this.lastReg = reg; this.lastHow = how;
+    this.header(); if (!quiet) this.top();
+    const T = k => this.t(k);
     const ms = Date.parse(reg.registeredAt), nowMs = Backend.mode === 'demo' ? Demo.clock() : Date.now();
     const fresh = how === 'new' || (how !== 'dup' && nowMs - ms < CONFIG.FRESH_MIN * 60000);
-    const d = String(reg.registeredAt), when = Number(d.slice(8, 10)) + ' ' + THAI_MON[Number(d.slice(5, 7)) - 1] + ' ' + (Number(d.slice(0, 4)) + 543) + ' เวลา ' + d.slice(11, 16) + ' น.';
+    const d = String(reg.registeredAt), when = T('when')(Number(d.slice(0, 4)), Number(d.slice(5, 7)), Number(d.slice(8, 10)), d.slice(11, 16));
     this.body.innerHTML = '<section class="sheet text-center">' +
-      (fresh ? '<div class="ok-badge">' + ICON.okBig + '</div><h2 class="mt-4">ลงทะเบียนสำเร็จ</h2><p class="lead">แสดงหน้าจอนี้กับเจ้าหน้าที่ เพื่อรับคูปองที่เคาน์เตอร์ลงทะเบียน</p>'
-        : '<div class="ok-badge" style="background:#6B7787;box-shadow:0 0 0 8px #EEF0F3">' + ICON.okBig + '</div><h2 class="mt-4">คุณลงทะเบียนแล้ว</h2><p class="lead">' + (how === 'dup' ? 'เบอร์นี้ลงทะเบียนไว้แล้ว ' : '') + 'สิทธิ์ 1 ท่านต่อ 1 ครั้ง ตลอดกิจกรรม</p>') +
+      (fresh ? '<div class="ok-badge">' + ICON.okBig + '</div><h2 class="mt-4">' + esc(T('okH')) + '</h2><p class="lead">' + esc(T('okLead')) + '</p>'
+        : '<div class="ok-badge" style="background:#6B7787;box-shadow:0 0 0 8px #EEF0F3">' + ICON.okBig + '</div><h2 class="mt-4">' + esc(T('dupH')) + '</h2><p class="lead">' + (how === 'dup' ? esc(T('dupPhone')) : '') + esc(T('dupLead')) + '</p>') +
       '<div class="rcard' + (fresh ? ' fresh mcard-in' : ' old') + '"><div class="rcard-top"><img src="' + CONFIG.LOGO + '" alt="AXTRA Club"></div>' +
-      '<div class="rcard-k">รหัสลงทะเบียน</div><div class="rcard-code tnum">' + esc(reg.code) + '</div>' +
-      '<div class="rcard-name">คุณ' + esc(reg.firstName + ' ' + reg.lastInitial) + '. · เบอร์ลงท้าย ' + esc(reg.phone4) + '</div>' +
-      '<div class="ticket-cut"></div><div class="rcard-foot"><div><small>ลงทะเบียนเมื่อ</small>' + esc(when) + '</div><div class="text-right"><small>เวลาขณะนี้</small><b class="tnum" data-clock></b></div></div></div>' +
-      (fresh ? '<p class="vch-note">นาฬิกาเดินตลอด ใช้ยืนยันว่าเป็นหน้าจอจริง ไม่ใช่ภาพแคป</p>' : '') +
-      '<div class="secure">' + ICON.lock + '<span>หน้านี้ไม่แสดงเบอร์เต็มและอีเมลของคุณ</span></div>' +
-      (State.config.prototype ? '<div class="found text-left text-[13.5px]" style="background:var(--accent-soft)"><b>ลองต่อ (เฉพาะ Prototype)</b><div class="grid gap-2 mt-2"><button type="button" class="btn btn-ghost btn-sm" data-again>ลองลงทะเบียนซ้ำด้วยเบอร์เดิม</button>' + (this.o.embedded ? '' : '<a class="btn btn-ghost btn-sm" href="' + esc(State.url({ p: 'dashboard', sim: '1' })) + '">ดู Dashboard แบบเรียลไทม์ (PIN 111111)</a>') + '</div></div>' : '') +
-      '<button type="button" class="btn-link mt-5 text-[13.5px]" data-next>ลงทะเบียนให้ท่านถัดไป (ใช้เครื่องเดียวกัน)</button></section>';
+      '<div class="rcard-k">' + esc(T('code')) + '</div><div class="rcard-code tnum">' + esc(reg.code) + '</div>' +
+      '<div class="rcard-name">' + esc(T('who')(reg.firstName, reg.lastInitial, reg.phone4)) + '</div>' +
+      '<div class="ticket-cut"></div><div class="rcard-foot"><div><small>' + esc(T('regAt')) + '</small>' + esc(when) + '</div><div class="text-right"><small>' + esc(T('now')) + '</small><b class="tnum" data-clock></b></div></div></div>' +
+      (fresh ? '<p class="vch-note">' + esc(T('clockNote')) + '</p>' : '') +
+      '<div class="secure">' + ICON.lock + '<span>' + esc(T('hidden')) + '</span></div>' +
+      (State.config.prototype ? '<div class="found text-left text-[13.5px]" style="background:var(--accent-soft)"><b>' + esc(T('demoH')) + '</b><div class="grid gap-2 mt-2"><button type="button" class="btn btn-ghost btn-sm" data-again>' + esc(T('demoAgain')) + '</button>' + (this.o.embedded ? '' : '<a class="btn btn-ghost btn-sm" href="' + esc(State.url({ p: 'dashboard', sim: '1' })) + '">' + esc(T('demoDash')) + '</a>') + '</div></div>' : '') +
+      '<button type="button" class="btn-link mt-5 text-[13.5px]" data-next>' + esc(T('next')) + '</button></section>';
     $('[data-next]', this.body).onclick = () => { store.del(ME_KEY); this.register(); };
-    const ag = $('[data-again]', this.body); if (ag) ag.onclick = () => { store.del(ME_KEY); this.register(); this.toast('กรอกเบอร์เดิมอีกครั้ง เพื่อดูหน้าที่ขึ้นเมื่อลงทะเบียนซ้ำ'); };
+    const ag = $('[data-again]', this.body); if (ag) ag.onclick = () => { store.del(ME_KEY); this.register(); this.toast(T('demoToast')); };
     clearInterval(this.clockT);
     const tick = () => { const el = $('[data-clock]', this.body); if (!el) return clearInterval(this.clockT); const t = new Date((Backend.mode === 'demo' ? Demo.clock() : Date.now()) + 7 * 3600e3); el.textContent = pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes()) + ':' + pad2(t.getUTCSeconds()); };
     tick(); this.clockT = setInterval(tick, 1000);
@@ -891,7 +1075,6 @@ class Cust {
     try { const r = await Backend.call('lookup', { code: reg.code, sig: reg.sig }); if (!r.success && r.code === 'NOT_FOUND') { store.del(ME_KEY); State.configLoaded = null; await State.loadConfig(); this.register(); } } catch (e) { /* ใช้ข้อมูลในเครื่องไปก่อน */ }
   }
 }
-const THAI_MON = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 /* =====================================================================
    PIN GATE
@@ -975,13 +1158,13 @@ class Dash {
       this.kpi('today', 'ลงทะเบียนวันนี้', nf(T.today) + ' <small>คน</small>', s.timeline.peak.count ? 'ช่วงพีค ' + s.timeline.peak.label + ' น.' : '') +
       this.kpi('mk', 'ยินยอมรับข่าวสาร', T.marketingPct + '%', nf(T.marketing) + ' คน นำไปทำ Remarketing ได้') +
       this.kpi('pace', 'ลงทะเบียน 15 นาทีล่าสุด', nf(T.pace) + ' <small>คน</small>', 'อัปเดตอัตโนมัติ') +
-      this.kpi('dup', 'สิทธิ์ต่อท่าน', '1 <small>ครั้ง</small>', 'เบอร์ซ้ำระบบไม่รับ ตลอด 4 วัน');
+      this.kpi('dup', 'สิทธิ์ต่อท่าน', '1 <small>ครั้ง</small>', 'เลขบัตรหรือเบอร์ซ้ำ ระบบไม่รับ ตลอด 4 วัน');
     setTimeout(() => $$('.bump', this.root).forEach(e => e.classList.remove('bump')), 900);
 
     const h = Handover.get(), step = destroyed ? 5 : h && h.confirmed ? 4 : h ? 3 : 1;
     $('[data-privacy]', this.root).innerHTML = '<div class="panel-title">ความปลอดภัยข้อมูล</div><p class="panel-sub">Dashboard นี้แสดงเฉพาะตัวเลขรวม</p>' +
       '<div class="big tnum">' + nf(T.registrations) + '</div><div class="text-[13px]" style="color:rgba(255,255,255,.75)">รายชื่อที่เก็บแบบเข้ารหัส</div>' +
-      '<ul><li>' + ICON.check + 'ไม่แสดงชื่อ เบอร์ หรืออีเมลของใครบนหน้านี้</li><li>' + ICON.check + 'ทุกหน้าของทีมงานต้องใส่ PIN</li><li>' + ICON.check + 'จบกิจกรรม ส่งมอบให้ AXTRA Club แบบเข้ารหัส แล้วทำลายทั้งหมด</li></ul>' +
+      '<ul><li>' + ICON.check + 'ไม่แสดงชื่อ เลขบัตร เบอร์ หรืออีเมลของใครบนหน้านี้</li><li>' + ICON.check + 'ทุกหน้าของทีมงานต้องใส่ PIN</li><li>' + ICON.check + 'จบกิจกรรม ส่งมอบให้ AXTRA Club แบบเข้ารหัส แล้วทำลายทั้งหมด</li></ul>' +
       '<div class="cycle">' + [['ระหว่างงาน', 'เก็บแบบเข้ารหัส'], ['ส่งมอบ', 'ไฟล์ล็อกรหัส'], ['ยืนยันรับ', 'ใบส่งมอบ'], ['ทำลาย', 'มีหนังสือรับรอง']].map((x, i) => '<div class="' + (i + 1 < step ? 'done' : i + 1 === step ? 'on' : '') + '"><b>' + x[0] + '</b>' + x[1] + '</div>').join('') + '</div>';
 
     if (window.Chart) {
@@ -996,7 +1179,7 @@ class Dash {
     if (!this.embedded) {
       $('[data-lanes]', this.root).innerHTML = '<div class="panel-title">ช่วงพีควันนี้</div><p class="panel-sub">ใช้วางกำลังคนที่จุดลงทะเบียน</p><div class="mt-4 text-4xl font-semibold tnum">' + (s.timeline.peak.count ? esc(s.timeline.peak.label) + ' <span class="text-xl">น.</span>' : '–') + '</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + (s.timeline.peak.count ? 'ลงทะเบียน ' + nf(s.timeline.peak.count) + ' คนใน 15 นาที' : 'ยังไม่มีข้อมูลวันนี้') + '</p>';
       $('[data-mk]', this.root).innerHTML = '<div class="panel-title">ยินยอมรับข่าวสาร</div><p class="panel-sub">รายชื่อที่ติดต่อชวนสมัครสมาชิกต่อได้</p><div class="mt-4 text-4xl font-semibold tnum">' + T.marketingPct + '%</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + nf(T.marketing) + ' จาก ' + nf(T.registrations) + ' คน</p>';
-      $('[data-note]', this.root).innerHTML = '<div class="panel-title">ข้อมูลที่เก็บ</div><p class="panel-sub">เท่าที่จำเป็นต่อการติดต่อกลับ</p><ul class="mt-3 grid gap-1.5 text-[14px]" style="color:var(--ink-2)"><li>• ชื่อ-นามสกุล</li><li>• เบอร์มือถือ</li><li>• อีเมล (ไม่บังคับ)</li><li>• ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา</li></ul>';
+      $('[data-note]', this.root).innerHTML = '<div class="panel-title">ข้อมูลที่เก็บ</div><p class="panel-sub">เท่าที่จำเป็นต่อการติดต่อกลับ</p><ul class="mt-3 grid gap-1.5 text-[14px]" style="color:var(--ink-2)"><li>• ชื่อ-นามสกุล</li><li>• เลขบัตรประชาชน หรือเลข Passport</li><li>• เบอร์มือถือ</li><li>• อีเมล (ไม่บังคับ)</li><li>• ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา</li></ul>';
     }
     const feed = s.recent.map(x => {
       const k = x.ms + x.detail, isNew = this.seen.size && !this.seen.has(k);
@@ -1056,7 +1239,7 @@ const Crypt = {
 
 const Handover = {
   KEY: 'axc4_handover',
-  cols: [['รหัสลงทะเบียน', 'code'], ['วันเวลาลงทะเบียน', 'registeredAt'], ['ชื่อ', 'firstName'], ['นามสกุล', 'lastName'], ['เบอร์มือถือ', 'phone'], ['อีเมล', 'email'], ['ยินยอม PDPA', 'consentPdpa'], ['ยินยอมรับข่าวสาร', 'consentMarketing']],
+  cols: [['รหัสลงทะเบียน', 'code'], ['วันเวลาลงทะเบียน', 'registeredAt'], ['ชื่อ', 'firstName'], ['นามสกุล', 'lastName'], ['ประเภทเอกสาร', 'idType'], ['เลขบัตรประชาชน / Passport', 'idNumber'], ['เบอร์มือถือ', 'phone'], ['อีเมล', 'email'], ['ยินยอม PDPA', 'consentPdpa'], ['ยินยอมรับข่าวสาร', 'consentMarketing'], ['ภาษาที่ใช้', 'lang']],
   get() { return store.get(this.KEY, null); },
   set(v) { if (v) store.set(this.KEY, v); else store.del(this.KEY); },
   stamp() { const n = new Date(Date.now() + 7 * 3600e3).toISOString(); return n.slice(0, 10) + '_' + n.slice(11, 16).replace(':', ''); },
@@ -1066,7 +1249,7 @@ const Handover = {
     try {
       if (!window.XLSX) await loadScript(CONFIG.SHEETJS);
       const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = [12, 19, 14, 14, 13, 28, 11, 16].map(w => ({ wch: w }));
+      ws['!cols'] = [12, 19, 14, 14, 13, 24, 13, 28, 11, 16, 10].map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
       return new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
     } catch (e) {
@@ -1085,9 +1268,9 @@ const Handover = {
     root.innerHTML = '<div class="grid gap-4" style="max-width:1100px;margin:0 auto">' +
       '<div><h2 class="text-xl font-semibold">ส่งมอบและทำลายข้อมูล</h2><p class="panel-sub">ขั้นตอนหลังจบงาน ทำโดยทีมงานที่ได้รับสิทธิ์เท่านั้น ทุกขั้นตอนมีหลักฐานส่งให้ลูกค้า</p></div>' +
       (destroyed ? '<div class="found" style="margin:0;background:var(--success-soft)"><b>ทำลายข้อมูลเรียบร้อยแล้ว</b> เมื่อ ' + esc(String(destroyed.at).slice(0, 16).replace('T', ' ')) + ' น. จำนวน ' + nf(destroyed.records) + ' รายการ <button type="button" class="btn-link ml-2" data-cert>ดูหนังสือรับรอง</button></div>' : '') +
-      '<div class="panel"><div class="flex flex-wrap items-start justify-between gap-2"><div><div class="panel-title">ข้อมูลในฐานข้อมูลตอนนี้ ' + nf(v.data.total) + ' รายการ</div><p class="panel-sub">ชื่อ เบอร์ และอีเมลถูกเข้ารหัสก่อนบันทึก ใครเปิดฐานข้อมูลก็เห็นแต่ตัวอักษรอ่านไม่ออก</p></div><span class="ex-tag">ตัวอย่างการแสดงผล</span></div>' +
-      '<div class="tscroll"><table class="ctable"><thead><tr><th>รหัส</th><th>วันเวลา</th><th>ชื่อ-นามสกุล</th><th>เบอร์มือถือ</th><th>อีเมล</th><th>PDPA</th><th>รับข่าวสาร</th></tr></thead><tbody>' +
-      (v.data.rows.length ? v.data.rows.map(r => '<tr><td class="tnum">' + esc(r.code) + '</td><td class="tnum">' + esc(r.at) + '</td><td class="c">' + esc(r.name) + '</td><td class="c">' + esc(r.phone) + '</td><td class="c">' + esc(r.email) + '</td><td>' + (r.pdpa ? 'ใช่' : 'ไม่') + '</td><td>' + (r.mk ? 'ใช่' : 'ไม่') + '</td></tr>').join('') : '<tr><td colspan="7" class="empty">ไม่มีข้อมูลในระบบ</td></tr>') +
+      '<div class="panel"><div class="flex flex-wrap items-start justify-between gap-2"><div><div class="panel-title">ข้อมูลในฐานข้อมูลตอนนี้ ' + nf(v.data.total) + ' รายการ</div><p class="panel-sub">ชื่อ เลขบัตร เบอร์ และอีเมลถูกเข้ารหัสก่อนบันทึก ใครเปิดฐานข้อมูลก็เห็นแต่ตัวอักษรอ่านไม่ออก</p></div><span class="ex-tag">ตัวอย่างการแสดงผล</span></div>' +
+      '<div class="tscroll"><table class="ctable"><thead><tr><th>รหัส</th><th>วันเวลา</th><th>ชื่อ-นามสกุล</th><th>เลขบัตร / Passport</th><th>เบอร์มือถือ</th><th>อีเมล</th><th>PDPA</th><th>รับข่าวสาร</th></tr></thead><tbody>' +
+      (v.data.rows.length ? v.data.rows.map(r => '<tr><td class="tnum">' + esc(r.code) + '</td><td class="tnum">' + esc(r.at) + '</td><td class="c">' + esc(r.name) + '</td><td class="c">' + esc(r.idn) + '</td><td class="c">' + esc(r.phone) + '</td><td class="c">' + esc(r.email) + '</td><td>' + (r.pdpa ? 'ใช่' : 'ไม่') + '</td><td>' + (r.mk ? 'ใช่' : 'ไม่') + '</td></tr>').join('') : '<tr><td colspan="8" class="empty">ไม่มีข้อมูลในระบบ</td></tr>') +
       '</tbody></table></div></div>' +
       card(1, 'สร้างไฟล์ส่งมอบแบบเข้ารหัส', 'ไฟล์ Excel ถูกล็อกด้วยรหัสผ่าน (AES-256) ส่งไฟล์กับรหัสผ่านคนละช่องทาง',
         '<div class="grid gap-2 mt-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><input class="input tnum" type="text" data-pw placeholder="รหัสผ่านอย่างน้อย 12 ตัว" autocomplete="off" spellcheck="false"><button type="button" class="btn btn-ghost" data-gen>สุ่มรหัสผ่าน</button><button type="button" class="btn btn-primary" data-make' + (destroyed ? ' disabled' : '') + '>สร้างไฟล์ส่งมอบ</button></div>' +
@@ -1205,9 +1388,9 @@ const app = () => $('#app');
 const topbar = (title, right) => '<header class="topbar"><div class="mx-auto max-w-[1440px] px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-2"><img class="topbar-logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club"><div class="min-w-0"><div class="text-[12.5px] leading-tight" style="color:rgba(255,255,255,.7)">' + esc(State.config.eventName) + '</div><div class="text-[16px] font-semibold leading-tight">' + title + '</div></div><div class="ml-auto flex flex-wrap items-center gap-2">' + right + '</div></div></header>';
 
 const SECURITY_HTML = '<div class="panel-title">ความปลอดภัยข้อมูล 5 ชั้น</div><p class="panel-sub">ออกแบบให้ข้อมูลลูกค้าปลอดภัยตั้งแต่กรอกจนทำลาย</p><div class="layers">' +
-  [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เบอร์ อีเมล (ไม่บังคับ) และความยินยอม 2 ข้อ ไม่เก็บเลขบัตรหรือข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
+  [['เก็บเท่าที่จำเป็น', 'ชื่อ-นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) และความยินยอม 2 ข้อ ไม่เก็บข้อมูลอื่น บันทึกเวลาที่ยินยอมเป็นหลักฐาน'],
     ['เข้ารหัสก่อนบันทึก', 'ข้อมูลส่วนตัวถูกล็อกก่อนเข้าฐานข้อมูล ใครเปิดฐานข้อมูลก็อ่านไม่ออก ระบบใช้บัญชีแยกเฉพาะงานนี้'],
-    ['ให้เห็นเท่าที่จำเป็น', 'Dashboard มีแต่ตัวเลขรวม หน้าจอลูกค้าแสดงเบอร์แค่ 4 ตัวท้าย ทุกหน้าของทีมงานต้องใส่ PIN'],
+    ['ให้เห็นเท่าที่จำเป็น', 'Dashboard มีแต่ตัวเลขรวม เลขบัตรไม่แสดงบนหน้าจอใดเลย หน้าจอลูกค้าแสดงเบอร์แค่ 4 ตัวท้าย ทุกหน้าของทีมงานต้องใส่ PIN'],
     ['ส่งมอบแบบเข้ารหัส', 'ไฟล์ล็อกด้วยรหัสผ่าน AES-256 ส่งไฟล์กับรหัสคนละช่องทาง มีใบส่งมอบพร้อมรหัสตรวจสอบไฟล์'],
     ['ทำลายหลังส่งมอบ', 'ลบฐานข้อมูล ระบบ หน้าเว็บ และสำเนาทั้งหมด พร้อมหนังสือรับรองการทำลายข้อมูล']]
     .map((x, i) => '<div class="layer"><i>' + (i + 1) + '</i><div><b>' + x[0] + '</b><span>' + x[1] + '</span></div></div>').join('') + '</div>';
@@ -1261,7 +1444,7 @@ const Views = {
       '<main class="mx-auto max-w-[1440px] px-4 py-5"><div class="show2">' +
       '<div><div class="flex items-end justify-between gap-3 mb-3"><div><div class="font-semibold">1. มือถือลูกค้า</div><p class="panel-sub">สแกน QR จุดลงทะเบียน กรอกข้อมูล แสดงหน้าจอกับเจ้าหน้าที่</p></div><button type="button" class="btn-link text-[13px] whitespace-nowrap" data-newcust>ลูกค้าคนใหม่</button></div><div class="phone sm"><div class="phone-screen" data-phone></div></div></div>' +
       '<div class="grid gap-4"><div class="panel"><div class="panel-title">ขั้นตอนหน้างาน</div><ol class="steps mt-3">' +
-      ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เบอร์ อีเมล (ไม่บังคับ)', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ไม่แจกซ้ำ'].map(x => '<li><span>' + x + '</span></li>').join('') +
+      ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เลขบัตรประชาชน/Passport เบอร์ อีเมล (ไม่บังคับ) ชาวต่างชาติกดปุ่ม EN มุมขวาบนได้', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ถ้าใช้เลขบัตรเดิมกับเบอร์ใหม่ ระบบไม่รับ ไม่แจกซ้ำ'].map(x => '<li><span>' + x + '</span></li>').join('') +
       '</ol></div><div class="panel">' + SECURITY_HTML + '</div></div></div>' +
       '<div class="mt-8"><div class="flex items-center justify-between gap-3 mb-3"><div><div class="font-semibold">2. Live Dashboard ที่แบรนด์เห็น</div><p class="panel-sub">ตัวเลขรวมเท่านั้น ไม่มีข้อมูลส่วนบุคคล</p></div><span class="live muted"><i></i><span data-live>Live</span></span></div><div data-dash></div></div></main>';
     const phone = new Cust($('[data-phone]'), { embedded: true });
