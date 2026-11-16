@@ -455,10 +455,9 @@ const GAS_URL = '';
 const CONFIG = {
   EVENT_NAME: 'AXTRA Club',
   HERO_TITLE: 'ลงทะเบียนร่วมกิจกรรม',
-  EVENT_DATE_TEXT: '17 และ 20–22 พฤศจิกายน 2569',
+  EVENT_DATE_TEXT: '',                  // ข้อความใต้หัวข้อ (ลูกค้าขอไม่ระบุวันที่)
   DAYS: ['2026-11-17', '2026-11-20', '2026-11-21', '2026-11-22'],   // วันกิจกรรม (ใช้แยกยอดรายวัน)
   DAY_LABELS: ['17 พ.ย.', '20 พ.ย.', '21 พ.ย.', '22 พ.ย.'],
-  LANES: 4,                             // จำนวนจุด QR ลงทะเบียน
   FRESH_MIN: 30,                        // หน้าจอเขียว "ลงทะเบียนสำเร็จ" แสดงภายในกี่นาทีหลังลงทะเบียน
   PDPA_TEXT: 'ข้าพเจ้าได้อ่านและรับทราบ {privacy} และยินยอมให้เก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อการลงทะเบียนร่วมกิจกรรม',
   PRIVACY_TEXT: 'นโยบายความเป็นส่วนตัว',
@@ -609,23 +608,20 @@ const Demo = (() => {
   const rng = seed => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   let rnd = rng(1), db, vt, speed = 1, lastTick = Date.now(), simTimer = null, saveTimer = null;
   const pick = (a, w) => { if (!w) return a[Math.floor(rnd() * a.length)]; let x = rnd() * w.reduce((p, q) => p + q, 0); for (let i = 0; i < a.length; i++) { x -= w[i]; if (x <= 0) return a[i]; } return a[a.length - 1]; };
-  const laneCodes = () => Array.from({ length: CONFIG.LANES }, (_, i) => 'E' + pad2(i + 1));
-  function newCode(rand) {
-    let c;
-    do { let s = ''; for (let i = 0; i < 6; i++) s += ALPHA[Math.floor(rand() * ALPHA.length)]; c = s.slice(0, 3) + '-' + s.slice(3); } while (db && db.regs.some(r => r.code === c));
-    return c;
-  }
+  const laneCodes = () => [];
+  const seqCode = n => 'A' + String(n).padStart(4, '0');   // รหัสเรียงลำดับ A0001, A0002, …
   function fakeReg(ms, lane) {
     return { ms, registeredAt: bkkIso(ms), firstName: pick(FN), lastName: pick(LN), phone: '0' + pick(['6', '8', '9']) + String(Math.floor(10000000 + rnd() * 89999999)),
       email: rnd() < 0.6 ? 'guest' + Math.floor(rnd() * 99999) + '@example.com' : '', consentPdpa: true, consentMarketing: rnd() < 0.7,
-      lane: lane || pick(laneCodes(), [30, 26, 24, 20]), code: newCode(rnd) };
+      lane: '', code: '' };
   }
   function seed() {
     rnd = rng(20261117);
     db = { regs: [], destroyed: null };
     const W = [4, 6, 9, 12, 14, 16, 15, 13, 12, 14, 16, 15, 12, 10, 9, 8, 8, 9, 10, 9, 8, 6, 5]; // ต่อ 15 นาที 10:00–15:40
     W.forEach((n, b) => { for (let k = 0; k < n; k++) db.regs.push(fakeReg(EVENT0 + (b * 15 + rnd() * (b === W.length - 1 ? 10 : 15)) * 60000)); });
-    db.regs.sort((a, b) => a.ms - b.ms);
+    db.regs.sort((a, b) => a.ms - b.ms).forEach((r, i) => { r.code = seqCode(i + 1); });
+    db.seq = db.regs.length;
     return db;
   }
   function load() {
@@ -661,7 +657,7 @@ const Demo = (() => {
       vt = Date.parse(next + 'T10:00:00+07:00'); lastTick = Date.now(); t = vt;
     }
     const n = Math.floor(rnd() * 3) + (rnd() < 0.3 ? 1 : 0);
-    for (let i = 0; i < n; i++) db.regs.push(fakeReg(t - rnd() * 20000));
+    for (let i = 0; i < n; i++) { const r = fakeReg(t - rnd() * 20000); db.seq = (db.seq || db.regs.length) + 1; r.code = seqCode(db.seq); db.regs.push(r); }
     save(); emit();
   }
   async function handle(req) {
@@ -680,7 +676,8 @@ const Demo = (() => {
         const ex = db.regs.find(x => x.phone === r.phone);
         if (ex) return ok(regOut(ex), 'เบอร์นี้ลงทะเบียนแล้ว', 'ALREADY_REGISTERED');
         if (r.email && db.regs.some(x => x.email === r.email)) return inv('email', 'อีเมลนี้ลงทะเบียนแล้ว (1 ท่านลงทะเบียนได้ 1 ครั้ง)', 'DUPLICATE');
-        Object.assign(r, { ms: t, registeredAt: bkkIso(t), code: newCode(Math.random) });
+        db.seq = (db.seq || db.regs.length) + 1;
+        Object.assign(r, { ms: t, registeredAt: bkkIso(t), code: seqCode(db.seq) });
         db.regs.push(r); save(); emit();
         return ok(regOut(r), 'ลงทะเบียนสำเร็จ');
       }
@@ -799,8 +796,7 @@ class Cust {
   laneLabel() { const m = String(this.o.lane || '').match(/(\d+)$/); return m ? Number(m[1]) : ''; }
   header() {
     this.head.innerHTML = '<div class="c-smile">' + ICON.smile + '</div><img class="logo" src="' + CONFIG.LOGO + '" alt="AXTRA Club">' +
-      '<h1 class="c-title sm">' + esc(CONFIG.HERO_TITLE) + '</h1><p class="c-sub">' + esc(CONFIG.EVENT_DATE_TEXT) + '</p>' +
-      (this.laneLabel() ? '<span class="c-chip">จุดลงทะเบียน <b>' + this.laneLabel() + '</b></span>' : '');
+      '<h1 class="c-title sm">' + esc(CONFIG.HERO_TITLE) + '</h1>' + (CONFIG.EVENT_DATE_TEXT ? '<p class="c-sub">' + esc(CONFIG.EVENT_DATE_TEXT) + '</p>' : '');
   }
   consentHTML(name, text) {
     return '<label class="check"><input type="checkbox" name="' + name + '"><span class="check-box">' + ICON.check + '</span><span>' + esc(text).replace('{privacy}', '<button type="button" class="btn-link" data-privacy>' + esc(CONFIG.PRIVACY_TEXT) + '</button>') + (name === 'consentPdpa' ? ' <span class="req">*</span>' : '') + '</span></label>';
@@ -884,7 +880,8 @@ class Cust {
       (fresh ? '<p class="vch-note">นาฬิกาเดินตลอด ใช้ยืนยันว่าเป็นหน้าจอจริง ไม่ใช่ภาพแคป</p>' : '') +
       '<div class="secure">' + ICON.lock + '<span>หน้านี้ไม่แสดงเบอร์เต็มและอีเมลของคุณ</span></div>' +
       (State.config.prototype ? '<div class="found text-left text-[13.5px]" style="background:var(--accent-soft)"><b>ลองต่อ (เฉพาะ Prototype)</b><div class="grid gap-2 mt-2"><button type="button" class="btn btn-ghost btn-sm" data-again>ลองลงทะเบียนซ้ำด้วยเบอร์เดิม</button>' + (this.o.embedded ? '' : '<a class="btn btn-ghost btn-sm" href="' + esc(State.url({ p: 'dashboard', sim: '1' })) + '">ดู Dashboard แบบเรียลไทม์ (PIN 111111)</a>') + '</div></div>' : '') +
-      '</section>';
+      '<button type="button" class="btn-link mt-5 text-[13.5px]" data-next>ลงทะเบียนให้ท่านถัดไป (ใช้เครื่องเดียวกัน)</button></section>';
+    $('[data-next]', this.body).onclick = () => { store.del(ME_KEY); this.register(); };
     const ag = $('[data-again]', this.body); if (ag) ag.onclick = () => { store.del(ME_KEY); this.register(); this.toast('กรอกเบอร์เดิมอีกครั้ง เพื่อดูหน้าที่ขึ้นเมื่อลงทะเบียนซ้ำ'); };
     clearInterval(this.clockT);
     const tick = () => { const el = $('[data-clock]', this.body); if (!el) return clearInterval(this.clockT); const t = new Date((Backend.mode === 'demo' ? Demo.clock() : Date.now()) + 7 * 3600e3); el.textContent = pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes()) + ':' + pad2(t.getUTCSeconds()); };
@@ -974,7 +971,7 @@ class Dash {
     const T = s.totals;
     $('[data-banner]', this.root).innerHTML = destroyed ? '<div class="found" style="margin:0 0 14px;background:var(--success-soft)"><b>ข้อมูลส่วนบุคคลถูกทำลายแล้ว</b> เมื่อ ' + esc(String(destroyed.at).slice(0, 16).replace('T', ' ')) + ' น. จำนวน ' + nf(destroyed.records) + ' รายการ</div>' : '';
     $('[data-kpis]', this.root).innerHTML =
-      this.kpi('reg', 'ผู้ลงทะเบียนรวมทุกวัน', nf(T.registrations) + ' <small>คน</small>', CONFIG.DAYS.length + ' วันกิจกรรม: ' + CONFIG.DAY_LABELS.join(', '), '', true) +
+      this.kpi('reg', 'ผู้ลงทะเบียนรวมทุกวัน', nf(T.registrations) + ' <small>คน</small>', 'รวม ' + CONFIG.DAYS.length + ' วันกิจกรรม', '', true) +
       this.kpi('today', 'ลงทะเบียนวันนี้', nf(T.today) + ' <small>คน</small>', s.timeline.peak.count ? 'ช่วงพีค ' + s.timeline.peak.label + ' น.' : '') +
       this.kpi('mk', 'ยินยอมรับข่าวสาร', T.marketingPct + '%', nf(T.marketing) + ' คน นำไปทำ Remarketing ได้') +
       this.kpi('pace', 'ลงทะเบียน 15 นาทีล่าสุด', nf(T.pace) + ' <small>คน</small>', 'อัปเดตอัตโนมัติ') +
@@ -997,7 +994,7 @@ class Dash {
     $('[data-peak]', this.root).textContent = s.timeline.peak.count ? 'ช่วงพีค ' + s.timeline.peak.label + ' น. ลงทะเบียน ' + nf(s.timeline.peak.count) + ' คน ใช้วางกำลังคนที่จุดลงทะเบียน' : 'ใช้วางกำลังคนที่จุดลงทะเบียน';
     this.bars('[data-days]', 'ยอดลงทะเบียนรายวัน', 'ทั้ง ' + CONFIG.DAYS.length + ' วันกิจกรรม', s.days.map(x => [x.label, x.count]), T.registrations);
     if (!this.embedded) {
-      this.bars('[data-lanes]', 'จุดลงทะเบียน', 'จำนวนคนต่อจุด', s.lanes.map(x => [x.label, x.count]), T.registrations);
+      $('[data-lanes]', this.root).innerHTML = '<div class="panel-title">ช่วงพีควันนี้</div><p class="panel-sub">ใช้วางกำลังคนที่จุดลงทะเบียน</p><div class="mt-4 text-4xl font-semibold tnum">' + (s.timeline.peak.count ? esc(s.timeline.peak.label) + ' <span class="text-xl">น.</span>' : '–') + '</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + (s.timeline.peak.count ? 'ลงทะเบียน ' + nf(s.timeline.peak.count) + ' คนใน 15 นาที' : 'ยังไม่มีข้อมูลวันนี้') + '</p>';
       $('[data-mk]', this.root).innerHTML = '<div class="panel-title">ยินยอมรับข่าวสาร</div><p class="panel-sub">รายชื่อที่ติดต่อชวนสมัครสมาชิกต่อได้</p><div class="mt-4 text-4xl font-semibold tnum">' + T.marketingPct + '%</div><p class="mt-1 text-[13.5px]" style="color:var(--ink-2)">' + nf(T.marketing) + ' จาก ' + nf(T.registrations) + ' คน</p>';
       $('[data-note]', this.root).innerHTML = '<div class="panel-title">ข้อมูลที่เก็บ</div><p class="panel-sub">เท่าที่จำเป็นต่อการติดต่อกลับ</p><ul class="mt-3 grid gap-1.5 text-[14px]" style="color:var(--ink-2)"><li>• ชื่อ-นามสกุล</li><li>• เบอร์มือถือ</li><li>• อีเมล (ไม่บังคับ)</li><li>• ความยินยอม PDPA และการรับข่าวสาร พร้อมเวลา</li></ul>';
     }
@@ -1059,7 +1056,7 @@ const Crypt = {
 
 const Handover = {
   KEY: 'axc4_handover',
-  cols: [['รหัสลงทะเบียน', 'code'], ['วันเวลาลงทะเบียน', 'registeredAt'], ['ชื่อ', 'firstName'], ['นามสกุล', 'lastName'], ['เบอร์มือถือ', 'phone'], ['อีเมล', 'email'], ['ยินยอม PDPA', 'consentPdpa'], ['ยินยอมรับข่าวสาร', 'consentMarketing'], ['จุดลงทะเบียน', 'lane']],
+  cols: [['รหัสลงทะเบียน', 'code'], ['วันเวลาลงทะเบียน', 'registeredAt'], ['ชื่อ', 'firstName'], ['นามสกุล', 'lastName'], ['เบอร์มือถือ', 'phone'], ['อีเมล', 'email'], ['ยินยอม PDPA', 'consentPdpa'], ['ยินยอมรับข่าวสาร', 'consentMarketing']],
   get() { return store.get(this.KEY, null); },
   set(v) { if (v) store.set(this.KEY, v); else store.del(this.KEY); },
   stamp() { const n = new Date(Date.now() + 7 * 3600e3).toISOString(); return n.slice(0, 10) + '_' + n.slice(11, 16).replace(':', ''); },
@@ -1069,7 +1066,7 @@ const Handover = {
     try {
       if (!window.XLSX) await loadScript(CONFIG.SHEETJS);
       const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = [12, 19, 14, 14, 13, 28, 11, 16, 12].map(w => ({ wch: w }));
+      ws['!cols'] = [12, 19, 14, 14, 13, 28, 11, 16].map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
       return new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
     } catch (e) {
@@ -1190,12 +1187,13 @@ const Poster = {
 
 const Kit = {
   render(root) {
-    const lanes = Array.from({ length: CONFIG.LANES }, (_, i) => 'E' + pad2(i + 1));
-    root.innerHTML = '<section><h2 class="text-xl font-semibold">QR จุดลงทะเบียน ' + CONFIG.LANES + ' จุด</h2><p class="panel-sub">ลูกค้าสแกนเพื่อลงทะเบียน ระบบนับยอดแยกตามจุด พิมพ์ติดขาตั้งหรือเคาน์เตอร์</p><div class="kit mt-4">' +
-      lanes.map(code => '<div class="kit-card"><div class="font-semibold">จุดลงทะเบียน ' + Number(code.slice(1)) + '</div><div class="text-[12.5px] muted tnum">' + code + '</div>' + qrSVG(State.url({ p: 'register', lane: code }), 2) + '<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" data-dl="' + code + '">ดาวน์โหลดโปสเตอร์</button></div>').join('') + '</div></section>';
+    const url = State.url({ p: 'register' });
+    root.innerHTML = '<section><h2 class="text-xl font-semibold">QR ลงทะเบียน</h2><p class="panel-sub">ใช้ QR เดียวกันทุกจุด พิมพ์ได้หลายป้าย ตั้งที่จุดไหนก็ได้</p><div class="kit mt-4"><div class="kit-card"><div class="font-semibold">QR ลงทะเบียน</div><div class="text-[12.5px] muted">ใช้ได้ทุกจุด</div>' + qrSVG(url, 2) +
+      '<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" data-dl>ดาวน์โหลดโปสเตอร์</button><button type="button" class="btn-link text-[13px] mt-2" data-copy>คัดลอกลิงก์</button></div></div></section>';
     root.addEventListener('click', async e => {
       const d = e.target.closest('[data-dl]');
-      if (d) { setBusy(d, true, 'กำลังสร้าง…'); await Poster.download({ title: 'สแกนลงทะเบียน', sub: 'กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอกับเจ้าหน้าที่', url: State.url({ p: 'register', lane: d.dataset.dl }), foot: 'จุดลงทะเบียน ' + Number(d.dataset.dl.slice(1)) }, 'QR_' + d.dataset.dl + '.png'); setBusy(d, false); }
+      if (d) { setBusy(d, true, 'กำลังสร้าง…'); await Poster.download({ title: 'สแกนลงทะเบียน', sub: 'กรอกข้อมูลไม่ถึง 1 นาที แล้วแสดงหน้าจอกับเจ้าหน้าที่', url, foot: 'ลงทะเบียนร่วมกิจกรรม', foot2: 'AXTRA Club' }, 'QR_Register.png'); setBusy(d, false); }
+      if (e.target.closest('[data-copy]')) { try { await navigator.clipboard.writeText(url); toast('คัดลอกลิงก์แล้ว'); } catch (err) { prompt('คัดลอกลิงก์นี้', url); } }
     });
   }
 };
@@ -1225,7 +1223,7 @@ const Views = {
     const session = await Gate.require(app(), 'Live Dashboard', ['client', 'admin']);
     const admin = session.role === 'admin';
     app().innerHTML = topbar('Live Dashboard', '<span class="live" style="color:rgba(255,255,255,.85)"><i></i><span data-live>กำลังโหลด…</span></span>' +
-      (admin ? '<nav class="flex gap-1" role="tablist"><button class="tab" role="tab" aria-selected="true" data-tab="dash">Dashboard</button><button class="tab" role="tab" aria-selected="false" data-tab="kit">QR ทีมงาน</button><button class="tab" role="tab" aria-selected="false" data-tab="data">ส่งมอบ & ทำลายข้อมูล</button></nav>' : '') +
+      (admin ? '<nav class="flex gap-1" role="tablist"><button class="tab" role="tab" aria-selected="true" data-tab="dash">Dashboard</button><button class="tab" role="tab" aria-selected="false" data-tab="kit">QR ลงทะเบียน</button><button class="tab" role="tab" aria-selected="false" data-tab="data">ส่งมอบ & ทำลายข้อมูล</button></nav>' : '') +
       (Backend.mode === 'demo' ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>จำลองคนลงทะเบียน</span></button>' : '') +
       '<button type="button" class="tb-btn" data-logout>ออกจากระบบ</button>') +
       '<main class="mx-auto max-w-[1440px] px-4 py-5"><div data-pane="dash"></div><div data-pane="kit" hidden></div><div data-pane="data" hidden></div></main>';
@@ -1266,7 +1264,7 @@ const Views = {
       ['น้องแนะนำให้ลงทะเบียนในแอป Axtra Club ก่อน ถ้าสำเร็จจบเลย', 'ถ้าลงในแอปไม่สำเร็จ น้องยื่น QR ลูกค้ากรอก ชื่อ นามสกุล เบอร์ อีเมล (ไม่บังคับ)', 'หน้าจอขึ้น <b>ลงทะเบียนสำเร็จ</b> พร้อมรหัสและนาฬิกาเดิน', 'น้องที่เคาน์เตอร์แจก <b>คูปองกระดาษ</b> (เขียนรหัสบนคูปองได้)', 'ถ้าลงซ้ำด้วยเบอร์เดิม ระบบขึ้น <b>คุณลงทะเบียนแล้ว</b> พร้อมเวลาครั้งแรก ไม่แจกซ้ำ'].map(x => '<li><span>' + x + '</span></li>').join('') +
       '</ol></div><div class="panel">' + SECURITY_HTML + '</div></div></div>' +
       '<div class="mt-8"><div class="flex items-center justify-between gap-3 mb-3"><div><div class="font-semibold">2. Live Dashboard ที่แบรนด์เห็น</div><p class="panel-sub">ตัวเลขรวมเท่านั้น ไม่มีข้อมูลส่วนบุคคล</p></div><span class="live muted"><i></i><span data-live>Live</span></span></div><div data-dash></div></div></main>';
-    const phone = new Cust($('[data-phone]'), { lane: 'E02', embedded: true });
+    const phone = new Cust($('[data-phone]'), { embedded: true });
     $('[data-newcust]').onclick = () => { store.del(ME_KEY); phone.start(); toast('เริ่มเป็นลูกค้าคนใหม่แล้ว'); };
     const d = new Dash($('[data-dash]'), { session, embedded: true });
     d.onUpdate = x => { $('[data-live]').textContent = 'Live  ' + timeOf(x.generatedAt) + ' น.'; };
