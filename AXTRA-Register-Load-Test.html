@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ทดสอบระบบลงทะเบียน</title>
+<style>
+:root{--ink:#0E1C30;--muted:#66768C;--line:#DCE4EE;--bg:#F1F5FA;--navy:#10294F;--blue:#1E70B9;--green:#13824F;--red:#C83A3A;--amber:#B7791F}
+*{box-sizing:border-box}body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:var(--navy);color:#fff;padding:18px 20px}header h1{margin:0;font-size:20px}header p{margin:4px 0 0;opacity:.8;font-size:13.5px}
+main{max-width:860px;margin:0 auto;padding:18px 16px 60px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:14px}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
+input{width:100%;height:42px;border:1.5px solid var(--line);border-radius:10px;padding:0 12px;font-size:15px}
+button{height:44px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-size:15px;font-weight:600;padding:0 18px;cursor:pointer;margin-top:12px}
+button:disabled{opacity:.5;cursor:default}
+.t{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.t:first-child{border-top:0}.t b{font-weight:600}.t small{display:block;color:var(--muted)}
+.st{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;background:#B9C4D2}
+.st.run{background:var(--amber)}.st.ok{background:var(--green)}.st.bad{background:var(--red)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted);font-size:13px}
+.verdict{font-size:18px;font-weight:700;padding:14px 16px;border-radius:12px;margin-top:14px;display:none}
+.verdict.ok{display:block;background:#E2F4EA;color:var(--green)}.verdict.bad{display:block;background:#FCEAEA;color:var(--red)}
+pre{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12.5px;max-height:260px;overflow:auto}
+ol{padding-left:20px}
+</style>
+</head>
+<body>
+<header><h1>ทดสอบระบบลงทะเบียนก่อนใช้งานจริง</h1><p>ส่งคำขอลงทะเบียนพร้อมกันจำนวนมากไปที่ระบบจริง แล้วตรวจว่ารหัสไม่ซ้ำ กันซ้ำถูกต้อง และข้อมูลเข้ารหัส/ถอดรหัสครบ</p></header>
+<main>
+  <div class="card">
+    <label for="url">URL ของเว็บแอป (Apps Script)</label>
+    <input id="url" value="https://script.google.com/macros/s/AKfycbz9yM-WXQxzQHhW51wrRZ4dRcVba_SLDJmz12ILD5DpVEruD1c93QEdpueHmn5gHOKr/exec" spellcheck="false">
+    <label for="pin">PIN ทีมงาน (ใช้ตรวจข้อมูลหลังทดสอบ ไม่ถูกส่งไปที่อื่น)</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+    <button id="go">เริ่มทดสอบ (ประมาณ 2–4 นาที)</button>
+    <div class="verdict" id="verdict"></div>
+  </div>
+  <div class="card" id="tests"></div>
+  <div class="card"><b>บันทึก</b><pre id="log"></pre></div>
+  <div class="card"><b>หลังทดสอบเสร็จ ต้องล้างข้อมูลทดสอบ</b>
+    <ol><li>กลับไปหน้า Apps Script</li><li>ช่องเลือกฟังก์ชันด้านบน เลือก <b>resetAllData</b> › กด <b>เรียกใช้</b></li><li>บันทึกการดำเนินการต้องขึ้น "ล้างข้อมูลแล้ว … รายการ ระบบพร้อมใช้งาน รหัสถัดไป: A0001"</li></ol>
+  </div>
+</main>
+<script>
+const TESTS = [
+  ['cfg', 'เชื่อมต่อระบบ', 'ระบบตอบกลับ และเปิดรับลงทะเบียน'],
+  ['one', 'ลงทะเบียน 1 คน', 'ได้รหัสลงทะเบียนรูปแบบ A0001'],
+  ['c30', 'ลงทะเบียนพร้อมกัน 30 คน', 'ทุกคนได้รหัส ไม่มีรหัสซ้ำ'],
+  ['c60', 'ลงทะเบียนพร้อมกัน 60 คน', 'จำลองช่วงคนแน่นหน้าเคาน์เตอร์'],
+  ['dup', 'กันลงทะเบียนซ้ำ', 'เบอร์ซ้ำ → รหัสเดิม · อีเมลซ้ำ → ไม่รับ · ส่งคำขอเดิมซ้ำ → ผลเดิม'],
+  ['chk', 'ตรวจข้อมูลในระบบ', 'จำนวนตรง รหัสเรียงต่อกันไม่ข้าม ถอดรหัสแล้วข้อมูลตรงกับที่ส่ง']
+];
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const logEl = $('#log'); const log = m => { logEl.textContent += m + '\n'; logEl.scrollTop = 1e9; };
+$('#tests').innerHTML = TESTS.map(t => '<div class="t" id="t-' + t[0] + '"><span class="st">·</span><div><b>' + t[1] + '</b><small>' + t[2] + '</small></div><span class="num"></span></div>').join('');
+const set = (k, st, num) => { const el = $('#t-' + k); const s = el.querySelector('.st'); s.className = 'st ' + st; s.textContent = st === 'ok' ? '✓' : st === 'bad' ? '!' : st === 'run' ? '…' : '·'; if (num != null) el.querySelector('.num').textContent = num; };
+let URL_ = '', stats = { busy: 0, netRetry: 0 };
+async function once(req) {
+  const r = await fetch(URL_, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(req) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+// เหมือนหน้าเว็บจริง: เน็ตหลุดลองใหม่ 3 ครั้ง (คำขอเดิม) · ระบบไม่ว่างรอคิวแล้วลองใหม่ 5 ครั้ง
+async function call(req) {
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try {
+      let r = await once(req);
+      for (let b = 0; r && r.code === 'BUSY' && b < 5; b++) { stats.busy++; await sleep(1200 + Math.random() * 2300); r = await once(req); }
+      return r;
+    } catch (e) { last = e; stats.netRetry++; await sleep(700 * (i + 1)); }
+  }
+  throw last;
+}
+const RUN = String(100 + Math.floor(Math.random() * 900));
+const phone = n => '09' + RUN + String(n).padStart(5, '0');
+const person = n => ({ firstName: 'ทดสอบ' + n, lastName: 'ระบบ' + RUN, phone: phone(n), email: n % 2 ? 'test' + RUN + '.' + n + '@example.com' : '', consentPdpa: true, consentMarketing: n % 3 === 0, lang: n % 4 ? 'th' : 'en' });
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 8);
+const sent = {};
+async function regMany(from, n) {
+  const t0 = performance.now(), times = [];
+  const res = await Promise.all(Array.from({ length: n }, async (_, i) => {
+    const k = from + i, p = person(k), s = performance.now();
+    try { const r = await call({ action: 'register', data: p, rid: rid() }); times.push(performance.now() - s); if (r.success) sent[r.data.code] = p; return r; }
+    catch (e) { return { success: false, code: 'NET', message: String(e) }; }
+  }));
+  const okc = res.filter(r => r.success && r.code === 'OK').map(r => r.data.code);
+  const bad = res.filter(r => !(r.success && r.code === 'OK'));
+  const sec = (performance.now() - t0) / 1000;
+  times.sort((a, b) => a - b);
+  return { okc, bad, sec, avg: times.reduce((a, b) => a + b, 0) / Math.max(1, times.length) / 1000, max: (times[times.length - 1] || 0) / 1000 };
+}
+$('#go').onclick = async () => {
+  URL_ = $('#url').value.trim(); const pin = $('#pin').value.trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(URL_)) return alert('URL ต้องขึ้นต้นด้วย https://script.google.com/macros/s/ และลงท้ายด้วย /exec');
+  if (!/^\d{6}$/.test(pin)) return alert('กรุณาใส่ PIN ทีมงาน 6 หลัก');
+  $('#go').disabled = true; logEl.textContent = ''; $('#verdict').className = 'verdict'; TESTS.forEach(t => set(t[0], '', ''));
+  let allOk = true; const fail = (k, m) => { allOk = false; set(k, 'bad'); log('✗ ' + m); };
+  try {
+    set('cfg', 'run'); const c = await call({ action: 'config' }); log('config: ' + JSON.stringify(c.data));
+    if (!c.success || !c.data.regOpen) { fail('cfg', 'ระบบไม่เปิดรับลงทะเบียน'); throw new Error('stop'); }
+    if (c.data.prototype) { fail('cfg', 'ระบบอยู่ในโหมดตัวอย่าง'); throw new Error('stop'); }
+    set('cfg', 'ok', 'OK');
+    set('one', 'run'); const o = await regMany(1, 1); log('ลงทะเบียน 1 คน: ' + o.okc.join(',') + ' ใช้เวลา ' + o.sec.toFixed(1) + ' วินาที');
+    if (o.okc.length !== 1 || !/^A\d{4,}$/.test(o.okc[0])) fail('one', 'ลงทะเบียนไม่สำเร็จ ' + JSON.stringify(o.bad[0])); else set('one', 'ok', o.okc[0] + ' · ' + o.sec.toFixed(1) + ' วิ');
+    if (o.okc[0] !== 'A0001') log('หมายเหตุ: รหัสแรกไม่ใช่ A0001 แปลว่ามีข้อมูลอยู่ก่อนแล้ว (ทดสอบต่อได้ ล้างทีหลัง)');
+    for (const [k, n, from] of [['c30', 30, 101], ['c60', 60, 201]]) {
+      set(k, 'run'); stats = { busy: 0, netRetry: 0 };
+      const r = await regMany(from, n);
+      log(n + ' คนพร้อมกัน: สำเร็จ ' + r.okc.length + '/' + n + ' · ใช้เวลารวม ' + r.sec.toFixed(1) + ' วิ · เฉลี่ยต่อคน ' + r.avg.toFixed(1) + ' วิ · ช้าสุด ' + r.max.toFixed(1) + ' วิ · ระบบไม่ว่าง(รอคิว) ' + stats.busy + ' ครั้ง · เน็ตลองใหม่ ' + stats.netRetry + ' ครั้ง');
+      r.bad.slice(0, 3).forEach(b => log('  ไม่สำเร็จ: ' + JSON.stringify(b).slice(0, 200)));
+      const uniq = new Set(r.okc).size === r.okc.length;
+      if (r.okc.length === n && uniq) set(k, 'ok', n + '/' + n + ' · ' + r.sec.toFixed(0) + ' วิ'); else fail(k, n + ' คน: สำเร็จ ' + r.okc.length + ' รหัสไม่ซ้ำ ' + uniq);
+    }
+    set('dup', 'run');
+    const p1 = person(1), first = Object.keys(sent).find(k => sent[k].phone === p1.phone);
+    const a = await call({ action: 'register', data: Object.assign({}, p1, { firstName: 'คนอื่น' }), rid: rid() });
+    const b = await call({ action: 'register', data: Object.assign({}, person(5000), { email: person(101).email.toUpperCase() }), rid: rid() });
+    const R = rid(), c1 = await call({ action: 'register', data: person(301), rid: R }), c2 = await call({ action: 'register', data: person(301), rid: R });
+    if (c1.success) sent[c1.data.code] = person(301);
+    log('เบอร์ซ้ำ: ' + a.code + ' ' + (a.data && a.data.code) + ' (ต้องเป็น ALREADY_REGISTERED ' + first + ')');
+    log('อีเมลซ้ำ: ' + b.code + ' ' + (b.data && b.data.field) + ' (ต้องเป็น DUPLICATE email)');
+    log('ส่งคำขอเดิมซ้ำ: ' + c1.code + ' ' + (c1.data && c1.data.code) + ' → ' + c2.code + ' ' + (c2.data && c2.data.code));
+    if (a.code === 'ALREADY_REGISTERED' && a.data.code === first && b.code === 'DUPLICATE' && b.data.field === 'email' && c1.code === 'OK' && c2.code === 'OK' && c1.data.code === c2.data.code) set('dup', 'ok', 'ถูกต้องทั้ง 3 กรณี'); else fail('dup', 'กันซ้ำไม่ถูกต้อง');
+    set('chk', 'run');
+    const L = await call({ action: 'login', pin });
+    if (!L.success) { fail('chk', 'PIN ทีมงานไม่ถูกต้อง (' + L.message + ')'); throw new Error('stop'); }
+    const ex = await call({ action: 'export', token: L.data.token });
+    const rows = ex.data.rows, codes = rows.map(r => r.code);
+    const contiguous = codes.every((c, i) => Number(c.slice(1)) === i + 1), uniq = new Set(codes).size === codes.length;
+    const mine = rows.filter(r => sent[r.code]);
+    const mism = mine.filter(r => { const p = sent[r.code]; return r.firstName !== p.firstName || r.lastName !== p.lastName || r.phone !== p.phone || r.email !== p.email.toLowerCase() || r.consentMarketing !== p.consentMarketing; });
+    log('ข้อมูลในระบบ ' + rows.length + ' รายการ · ของรอบนี้ ' + mine.length + '/' + Object.keys(sent).length + ' · รหัสเรียงต่อกัน ' + (contiguous ? 'ใช่' : 'ไม่') + ' · ไม่ซ้ำ ' + (uniq ? 'ใช่' : 'ไม่') + ' · ถอดรหัสไม่ตรง ' + mism.length);
+    if (mine.length === Object.keys(sent).length && contiguous && uniq && !mism.length) set('chk', 'ok', rows.length + ' รายการ ถูกต้อง'); else fail('chk', 'ข้อมูลไม่ตรง');
+  } catch (e) { if (e.message !== 'stop') { allOk = false; log('ผิดพลาด: ' + e); } }
+  const v = $('#verdict');
+  v.className = 'verdict ' + (allOk ? 'ok' : 'bad');
+  v.textContent = allOk ? 'ผ่านทุกข้อ ✓ ต่อไปล้างข้อมูลทดสอบด้วย resetAllData (ดูด้านล่าง)' : 'มีข้อที่ไม่ผ่าน กรุณาแคปหน้าจอนี้ส่งให้ทีมระบบ';
+  $('#go').disabled = false;
+};
+</script>
+</body>
+</html>
