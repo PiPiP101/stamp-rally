@@ -425,6 +425,7 @@ select.input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .rcard-foot{display:grid;grid-template-columns:1fr auto;gap:10px;padding:14px 18px 16px;font-size:14px}
 .rcard-foot small{display:block;font-size:11.5px;color:rgba(255,255,255,.66)}
 .rcard-foot b{font-size:20px;font-weight:600}
+.tb-btn.on svg path{stroke:var(--secondary)}
 .show2{display:grid;gap:22px;align-items:start;grid-template-columns:minmax(0,1fr)}
 @media (min-width:1080px){.show2{grid-template-columns:400px minmax(0,1fr)}}
 
@@ -652,7 +653,14 @@ const Demo = (() => {
       { days: CONFIG.DAYS, dayLabels: CONFIG.DAY_LABELS, laneCodes: laneCodes(), today: dayOf(t), nowMin: minutes(t), startMin: 600, step: 15 });
   }
   function simTick() {
-    const t = now(), n = Math.floor(rnd() * 3) + (rnd() < 0.3 ? 1 : 0);
+    let t = now();
+    // เลยเวลา 21:00 → ข้ามไปวันกิจกรรมถัดไป 10:00 (โชว์ยอดรายวันครบ 4 วัน) วันสุดท้ายแล้วหยุด
+    if (minutes(t) >= 21 * 60 || minutes(t) < 9 * 60) {
+      const next = CONFIG.DAYS.find(d => d > dayOf(t - 12 * 3600e3));
+      if (!next) { api.simulate(false); emit(); return; }
+      vt = Date.parse(next + 'T10:00:00+07:00'); lastTick = Date.now(); t = vt;
+    }
+    const n = Math.floor(rnd() * 3) + (rnd() < 0.3 ? 1 : 0);
     for (let i = 0; i < n; i++) db.regs.push(fakeReg(t - rnd() * 20000));
     save(); emit();
   }
@@ -708,7 +716,7 @@ const Demo = (() => {
     }
   }
   load();
-  return {
+  const api = {
     handle, PINS, on: fn => { listeners.add(fn); return () => listeners.delete(fn); },
     clock: () => now(), simulating: () => !!simTimer,
     simulate(on) {
@@ -717,6 +725,7 @@ const Demo = (() => {
     },
     reset() { this.simulate(false); store.del(KEY); seed(); vt = SEED_END; lastTick = Date.now(); rnd = rng(Date.now() % 100000); save(); emit(); }
   };
+  return api;
 })();
 
 /* =====================================================================
@@ -874,7 +883,7 @@ class Cust {
       '<div class="ticket-cut"></div><div class="rcard-foot"><div><small>ลงทะเบียนเมื่อ</small>' + esc(when) + '</div><div class="text-right"><small>เวลาขณะนี้</small><b class="tnum" data-clock></b></div></div></div>' +
       (fresh ? '<p class="vch-note">นาฬิกาเดินตลอด ใช้ยืนยันว่าเป็นหน้าจอจริง ไม่ใช่ภาพแคป</p>' : '') +
       '<div class="secure">' + ICON.lock + '<span>หน้านี้ไม่แสดงเบอร์เต็มและอีเมลของคุณ</span></div>' +
-      (State.config.prototype ? '<div class="found text-left text-[13.5px]" style="background:var(--accent-soft)"><b>ลองต่อ (เฉพาะ Prototype)</b><div class="grid gap-2 mt-2"><button type="button" class="btn btn-ghost btn-sm" data-again>ลองลงทะเบียนซ้ำด้วยเบอร์เดิม</button>' + (this.o.embedded ? '' : '<a class="btn btn-ghost btn-sm" href="' + esc(State.url({ p: 'dashboard' })) + '">ดู Dashboard (PIN 111111)</a>') + '</div></div>' : '') +
+      (State.config.prototype ? '<div class="found text-left text-[13.5px]" style="background:var(--accent-soft)"><b>ลองต่อ (เฉพาะ Prototype)</b><div class="grid gap-2 mt-2"><button type="button" class="btn btn-ghost btn-sm" data-again>ลองลงทะเบียนซ้ำด้วยเบอร์เดิม</button>' + (this.o.embedded ? '' : '<a class="btn btn-ghost btn-sm" href="' + esc(State.url({ p: 'dashboard', sim: '1' })) + '">ดู Dashboard แบบเรียลไทม์ (PIN 111111)</a>') + '</div></div>' : '') +
       '</section>';
     const ag = $('[data-again]', this.body); if (ag) ag.onclick = () => { store.del(ME_KEY); this.register(); this.toast('กรอกเบอร์เดิมอีกครั้ง เพื่อดูหน้าที่ขึ้นเมื่อลงทะเบียนซ้ำ'); };
     clearInterval(this.clockT);
@@ -1217,8 +1226,18 @@ const Views = {
     const admin = session.role === 'admin';
     app().innerHTML = topbar('Live Dashboard', '<span class="live" style="color:rgba(255,255,255,.85)"><i></i><span data-live>กำลังโหลด…</span></span>' +
       (admin ? '<nav class="flex gap-1" role="tablist"><button class="tab" role="tab" aria-selected="true" data-tab="dash">Dashboard</button><button class="tab" role="tab" aria-selected="false" data-tab="kit">QR ทีมงาน</button><button class="tab" role="tab" aria-selected="false" data-tab="data">ส่งมอบ & ทำลายข้อมูล</button></nav>' : '') +
+      (Backend.mode === 'demo' ? '<span class="text-[13px]" style="color:rgba(255,255,255,.8)" data-clock></span><button type="button" class="tb-btn" data-sim>' + ICON.chev + '<span>จำลองคนลงทะเบียน</span></button>' : '') +
       '<button type="button" class="tb-btn" data-logout>ออกจากระบบ</button>') +
       '<main class="mx-auto max-w-[1440px] px-4 py-5"><div data-pane="dash"></div><div data-pane="kit" hidden></div><div data-pane="data" hidden></div></main>';
+    if (Backend.mode === 'demo') {
+      const simBtn = $('[data-sim]');
+      const setSim = () => { const on = Demo.simulating(); simBtn.classList.toggle('on', on); $('span', simBtn).textContent = on ? 'หยุดจำลอง' : 'จำลองคนลงทะเบียน'; };
+      simBtn.onclick = () => { Demo.simulate(!Demo.simulating()); setSim(); if (Demo.simulating()) toast('กำลังจำลองคนลงทะเบียน เวลาเดินเร็วขึ้น 30 เท่า'); };
+      Demo.on(setSim);
+      const clk = () => { const t = new Date(Demo.clock() + 7 * 3600e3); $('[data-clock]').textContent = 'เวลาจำลอง ' + t.getUTCDate() + ' พ.ย. ' + pad2(t.getUTCHours()) + ':' + pad2(t.getUTCMinutes()) + ' น.'; };
+      clk(); setInterval(clk, 1000);
+      if (params.sim) { Demo.simulate(true); setSim(); }
+    }
     const d = new Dash($('[data-pane=dash]'), { session });
     d.onUpdate = x => { $('[data-live]').textContent = 'Live  อัปเดต ' + timeOf(x.generatedAt) + ':' + String(x.generatedAt).slice(17, 19); };
     d.onError = () => { $('[data-live]').textContent = 'เชื่อมต่อไม่ได้ กำลังลองใหม่'; };
@@ -1270,8 +1289,12 @@ const Views = {
    BOOT
    ===================================================================== */
 (async function boot() {
-  if (Backend.mode === 'demo') { const b = $('#demo-bar'); b.hidden = false; b.textContent = 'โหมดตัวอย่าง: ข้อมูลจำลอง ยังไม่เชื่อมฐานข้อมูลจริง'; }
   const params = await Backend.params();
+  if (Backend.mode === 'demo') {
+    const b = $('#demo-bar'), base = location.href.split('?')[0].split('#')[0], onDash = /^(dashboard|admin)$/i.test(params.p || '');
+    b.hidden = false;
+    b.innerHTML = 'โหมดตัวอย่าง: ข้อมูลจำลอง · ' + (onDash ? '<a href="' + base + '?p=register" style="text-decoration:underline">ไปหน้าลงทะเบียน</a>' : '<a href="' + base + '?p=dashboard&sim=1" style="text-decoration:underline">ดู Dashboard แบบเรียลไทม์</a>');
+  }
   const wide = window.matchMedia && window.matchMedia('(min-width: 900px)').matches;
   const p = String(params.p || (Backend.mode === 'demo' && wide ? 'showcase' : 'register')).toLowerCase();
   if (p === 'dashboard' || p === 'admin') return Views.dashboard(params);
